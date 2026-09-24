@@ -161,7 +161,8 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 ### Fase 0 — Preparación
 - [x] Skills instaladas y detectadas por Cursor
 - [x] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
-- [ ] Dos proyectos Supabase Free (desarrollo y producción); pooler verificado. Sin PITR ni backups de pago
+- [x] Proyecto Supabase Free de desarrollo creado; pooler (5432 y 6543) verificado. Sin PITR ni backups de pago
+- [ ] Proyecto Supabase Free de producción (segundo proyecto activo del plan Free)
 - [ ] Proyecto Cloudflare conectado al repo (Preview URLs activas)
 - [ ] Alertas de costo y de errores configuradas
 - [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
