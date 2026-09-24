@@ -91,6 +91,7 @@ La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte 
 
 ## 5. Flujo de trabajo
 
+- **GitHub:** repositorio y operaciones (`gh`, push, PR) bajo la cuenta **[sulbase](https://github.com/sulbase)** — no la personal `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
