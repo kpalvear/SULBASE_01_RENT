@@ -160,7 +160,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 ### Fase 0 — Preparación
 - [x] Skills instaladas y detectadas por Cursor
-- [ ] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
+- [x] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
 - [ ] Dos proyectos Supabase Free (desarrollo y producción); pooler verificado. Sin PITR ni backups de pago
 - [ ] Proyecto Cloudflare conectado al repo (Preview URLs activas)
 - [ ] Alertas de costo y de errores configuradas
