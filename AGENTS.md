@@ -1,0 +1,239 @@
+# AGENTS.md — SULBASE_01_RENT
+
+Plataforma de gestión de propiedades **100 % edge**: Cloudflare Workers + Supabase (Postgres), con Hono y Drizzle ORM.
+Este archivo es la fuente de verdad del proyecto. Cualquier asistente de IA debe leerlo antes de tocar código.
+
+> **Prevalencia:** las decisiones de la sección 1 reemplazan a las de la arquitectura anterior (Railway + Node/Bun).
+> Lo demás de esa arquitectura (validación, Hono RPC, migraciones versionadas, CI, GEO) se conserva, adaptado.
+
+---
+
+## 1. Decisiones vigentes
+
+| Tema | Decisión |
+|---|---|
+| Backend | **Hono en Cloudflare Workers** (no Railway) |
+| Base de datos | **Supabase (PostgreSQL)** |
+| ORM | **Drizzle ORM** |
+| Conexión a BD | Hyperdrive o el pooler de Supabase; nunca un pool persistente |
+| Archivos | R2 o Supabase Storage |
+| Tareas en segundo plano | Cloudflare Queues + Cron Triggers, en lotes pequeños |
+| Base de código | **OpenProperty** (clawnify), portado de D1/SQLite a Postgres |
+| Referencia de lógica | **Condo** (open-condo-software), solo como referencia de lectura |
+| Agente de desarrollo | Cursor, con las skills de `.agents/skills/` |
+
+## 2. Punto de partida: OpenProperty
+
+Copia de partida: [clawnify/OpenProperty](https://github.com/clawnify/OpenProperty) `a493028` (`master`). El historial upstream permanece en ese repositorio.
+
+- Servidor: `src/server/index.ts` (~950 líneas, SQL a mano) + `schema.sql` (D1/SQLite) + `@clawnify/db`.
+- Cliente: React 19 + Vite + Tailwind + Radix (se conserva en fase 1).
+- Módulos: propiedades, unidades, inquilinos, contratos, cargos de renta, pagos, proveedores, órdenes de trabajo, solicitudes, panel y ajustes.
+- **No tiene autenticación ni organizaciones**: es de un solo usuario. Hay que añadirlas.
+- Dependencias a reemplazar: `@clawnify/db` (y revisar `@clawnify/app`).
+
+### Traducción SQLite → Postgres
+- `INTEGER PRIMARY KEY AUTOINCREMENT` → `uuid` con `defaultRandom()`
+- fechas en `TEXT` → `date` / `timestamptz`
+- importes `REAL` → `numeric(12,2)`
+- `datetime('now')` → `now()`
+- estados en texto libre → `pgEnum` o `CHECK`
+- conservar claves foráneas, índices y el único `rent_charges (lease_id, period)`
+
+## 3. Skills instaladas (alcance: proyecto, en `.agents/skills/`)
+
+| Skill | Fuente | Uso |
+|---|---|---|
+| `hono` | honojs/skills (oficial) | Rutas, middleware, validación, RPC |
+| `cloudflare` | cloudflare/skills (oficial) | Plataforma Workers, R2, Queues |
+| `wrangler` | cloudflare/skills (oficial) | Despliegue y configuración |
+| `workers-best-practices` | cloudflare/skills (oficial) | Buenas prácticas de Workers |
+| `supabase` | supabase/agent-skills (oficial) | Uso de Supabase |
+| `supabase-postgres-best-practices` | supabase/agent-skills (oficial) | Diseño y rendimiento de Postgres |
+
+Pendientes (no crear todavía): skill propia `condo-port` y, opcionalmente, una skill comunitaria de Drizzle (revisar su `SKILL.md` antes).
+La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte `.agents/skills/`.
+
+## 4. Arquitectura por capas
+
+### 4.1 Frontend
+- **Fase 1:** conservar el cliente Vite + React de OpenProperty (área privada, tras login).
+- **Decisión abierta:** SSR con Remix / React Router v7 para páginas públicas y comerciales (SEO + GEO). Si se adopta: contenido comercial siempre renderizado en servidor, `meta`/Open Graph/canonical por ruta, `sitemap.xml` generado.
+- Alojamiento: Cloudflare Workers con activos estáticos (o Pages), con Preview URL por rama/PR.
+
+### 4.2 Backend (Core API)
+- Hono en Workers. Estructura por dominio: `properties`, `units`, `tenants`, `leases`, `rent`, `payments`, `vendors`, `maintenance`, `applications`, `settings`.
+- **Hono RPC:** los tipos del backend se importan en el frontend; si la API cambia, el typecheck rompe el build.
+- **Validación con Zod en cada endpoint.**
+- **Rate limiting** en endpoints públicos y de autenticación (mecanismo de Cloudflare o middleware; verificar opciones vigentes).
+- **Secretos** solo en el gestor de entorno (`wrangler secret put`), nunca en el repositorio.
+- **Costos:** configurar alertas de uso y gasto en Cloudflare y Supabase el día 1 (verificar qué límites duros ofrece cada plan).
+
+### 4.3 Persistencia
+- Supabase Postgres + Drizzle. Esquema en `src/db/schema.ts`.
+- **Migraciones versionadas en el repositorio** (`drizzle-kit generate`); prohibido modificar el esquema a mano en producción.
+- Migraciones aplicadas desde CI o local, nunca desde el Worker.
+- Usar la URL con pooling (Hyperdrive o pooler de Supabase).
+- Verificar que el plan incluya **backups y PITR** y probar una restauración antes del lanzamiento.
+- Staging con proyecto/base de datos separado de producción.
+
+### 4.4 Multi-organización y permisos
+- Añadir `organization_id` (not null) a las tablas principales y una tabla `memberships` con rol.
+- Autenticación: Supabase Auth.
+- **Decisión abierta:** permisos en la aplicación (recomendado como base) vs. RLS en Postgres (como red de seguridad o principal). Decidir antes de escribir endpoints protegidos.
+- Roles iniciales sugeridos: `owner`, `manager`, `staff`, `viewer`.
+
+### 4.5 Visibilidad para agentes de IA (GEO)
+- `robots.txt`: permitir los rastreadores de IA que interesen; **verificar los user-agents exactos en la documentación de cada proveedor** antes de publicar.
+- JSON-LD (schema.org) solo en páginas públicas (`Organization`, `Product`, `Offer`, `FAQPage`, `SoftwareApplication`, según el caso).
+- Acciones comerciales expuestas como endpoints `POST`/`PUT` limpios, con errores claros e idempotencia donde aplique.
+- OpenAPI generado desde Hono (p. ej. con `@hono/zod-openapi`).
+
+## 5. Flujo de trabajo
+
+- `main` protegida; todo entra por Pull Request con al menos una revisión humana.
+- **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
+- **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
+- **Prohibido** que un asistente ejecute migraciones o comandos destructivos contra producción (`drizzle-kit push/migrate`, SQL destructivo, seeds) sin confirmación explícita.
+
+| Entorno | Frontend | Backend | Base de datos |
+|---|---|---|---|
+| Local | Vite dev | `wrangler dev` | Postgres local o proyecto de desarrollo |
+| Lab / Preview | Preview URL | Worker `dev` | Proyecto Supabase de desarrollo |
+| Staging | Preview/Staging | Worker staging | BD de staging |
+| Producción | Cloudflare | Worker prod | BD de producción |
+
+## 6. Laboratorio de experimentos
+
+Espacio para probar ideas sin riesgo. Reglas:
+- Trabajar en ramas `lab/<tema>`, nunca directo en `main`.
+- Usar **solo** la BD y el Worker de desarrollo; jamás credenciales de producción.
+- Cada experimento termina con una nota breve: qué se probó, resultado y decisión (adoptar, descartar, seguir).
+
+Experimentos candidatos:
+- [ ] Máquina de estados de órdenes de trabajo inspirada en los tickets de Condo
+- [ ] Permisos en la aplicación vs. RLS (comparar complejidad y rendimiento)
+- [ ] Historial de cambios por triggers de Postgres (`*_history`) y soft delete (`deleted_at`)
+- [ ] Hono RPC + OpenAPI en paralelo sobre las mismas rutas
+- [ ] Cloudflare Queues para tareas largas (generación mensual de cargos, importaciones)
+- [ ] Subida de archivos a R2 vs. Supabase Storage
+- [ ] Skill propia `condo-port` (cuando se decida crearla)
+- [ ] Jev (TypeSafe AI) como capa de decisión: clasificar órdenes de trabajo, puntuar solicitudes, estimar riesgo de mora (ver 6.1)
+- [ ] _Por definir:_ ______________________
+
+### 6.1 Experimento: Jev como capa de decisión
+
+**Qué es (según la prensa y la ficha pública; verificar en la documentación oficial antes de integrar):** un modelo de TypeSafe AI que no genera texto. Recibe un estado (texto o JSON) y preguntas tipadas, y devuelve valores estructurados con probabilidades. Sirve para clasificar, puntuar y elegir entre opciones; **no** para escribir código ni conversar. No sustituye a Cursor ni a un LLM.
+
+**Casos de uso candidatos en este proyecto:**
+- Clasificar órdenes de trabajo: categoría (plomería, electricidad, HVAC…), prioridad y urgencia. (En Condo el ticket se autoclasifica al crearse; aquí sería el equivalente.)
+- Sugerir a qué proveedor asignar una orden.
+- Puntuar solicitudes de inquilinos (`applications`) como apoyo, nunca como decisión final.
+- Estimar la probabilidad de mora en un cargo de renta.
+- Decidir si un caso se escala a una persona.
+
+**Reglas del experimento:**
+- Solo en rama `lab/jev`, con datos de prueba; **sin datos personales reales** hasta revisar la política de privacidad y retención del proveedor.
+- La llamada se hace **solo desde el Worker** (Hono); la clave va en `wrangler secret put`, nunca en el cliente ni en el repositorio.
+- Toda decisión se guarda en una tabla `ai_decisions` (entidad, pregunta, valor, probabilidad, versión del modelo, fecha) para poder auditarla.
+- Umbral de confianza: por debajo de `[definir]` pasa a revisión humana.
+- Decisiones con efecto sobre personas (aceptar o rechazar una solicitud, cobrar una penalidad) **siempre las confirma un humano**.
+- Comparar contra una regla determinista simple antes de adoptarlo: si no mejora, se descarta.
+- Verificar precio, límites, disponibilidad (acceso anticipado vs. general) y compatibilidad con Workers en la documentación oficial.
+
+**Resultado esperado:** nota breve con precisión observada, latencia, costo por decisión y recomendación (adoptar, descartar, seguir).
+
+### Referencia de Condo: estados de ticket (para el experimento de órdenes de trabajo)
+Estados: `OPEN`, `IN_PROGRESS`, `DEFERRED`, `COMPLETED`, `CLOSED`, `DECLINED`.
+
+| Desde | Puede pasar a |
+|---|---|
+| OPEN | IN_PROGRESS, DEFERRED, DECLINED |
+| IN_PROGRESS | DEFERRED, COMPLETED, OPEN, DECLINED |
+| COMPLETED | OPEN, CLOSED |
+| DEFERRED | OPEN, DECLINED |
+| DECLINED | — (terminal) |
+
+Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada cambio queda registrado en un historial.
+
+## 7. Hoja de ruta (marca cada paso al completarlo)
+
+### Fase 0 — Preparación
+- [x] Skills instaladas y detectadas por Cursor
+- [ ] Repositorio con `main` protegida y este `AGENTS.md` en la raíz
+- [ ] Proyecto Supabase creado (desarrollo y staging); pooling y PITR verificados
+- [ ] Proyecto Cloudflare conectado al repo (Preview URLs activas)
+- [ ] Alertas de costo y de errores configuradas
+- [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
+
+### Fase 1 — Esquema
+- [ ] `src/db/schema.ts` en Drizzle a partir de `schema.sql` (con `organization_id`, sin RLS aún)
+- [ ] `drizzle.config.ts` y primera migración versionada
+- [ ] Migración aplicada al Supabase de desarrollo
+
+### Fase 2 — Capa de datos
+- [ ] Reemplazar `@clawnify/db` por Drizzle (Hyperdrive / pooler)
+- [ ] `wrangler.toml` sin binding a D1; añadir Hyperdrive si aplica
+- [ ] `wrangler dev` funcionando contra Supabase
+
+### Fase 3 — API
+- [ ] Partir `index.ts` en módulos de rutas por dominio
+- [ ] Validación Zod en cada endpoint
+- [ ] Hono RPC: tipos compartidos backend ↔ frontend
+- [ ] Panel (`/api/dashboard/summary`) y generación de cargos de renta revisados
+
+### Fase 4 — Autenticación y organizaciones
+- [ ] Decisión: permisos en la aplicación vs. RLS
+- [ ] Supabase Auth integrado
+- [ ] `organizations` + `memberships` con roles
+- [ ] Todas las consultas filtradas por organización
+- [ ] Tests de aislamiento entre organizaciones
+
+### Fase 5 — CI y despliegue
+- [ ] CI: typecheck, lint, tests, build, escaneo de secretos
+- [ ] Despliegue del Worker a staging y luego a producción
+- [ ] Rate limiting en endpoints públicos y de autenticación
+- [ ] Restauración de backup probada de punta a punta
+
+### Fase 6 — SEO y GEO (si hay páginas públicas)
+- [ ] Decisión sobre SSR con Remix / React Router v7
+- [ ] `robots.txt`, `sitemap.xml` y JSON-LD base
+- [ ] OpenAPI publicado desde Hono
+- [ ] Datos estructurados validados con una herramienta de resultados enriquecidos
+
+### Fase 7 — Funciones inspiradas en Condo (opcional)
+- [ ] Órdenes de trabajo con máquina de estados e historial
+- [ ] Soft delete y versionado
+- [ ] Roles y permisos más finos
+
+## 8. Checklist previo al lanzamiento
+
+- [ ] Restauración de backup probada
+- [ ] Rate limiting y validación de entrada revisados
+- [ ] Prueba de carga básica sobre la API
+- [ ] Aislamiento entre organizaciones verificado
+- [ ] Plan de rollback documentado
+
+## 9. Control de riesgos
+
+| Riesgo | Control |
+|---|---|
+| Gasto descontrolado | Alertas y límites en Cloudflare y Supabase |
+| Pérdida de datos | Backups + PITR + restauración probada |
+| Bug por cambio de API | Hono RPC + typecheck en CI |
+| Abuso de tráfico | Rate limiting + protección de Cloudflare |
+| Secretos expuestos | Gestor de entorno + escaneo en CI |
+| Fuga entre organizaciones | Filtro por `organization_id` + tests (y RLS si se adopta) |
+| Cambio destructivo en producción | Migraciones solo por CI; prohibido para asistentes de IA |
+| Dependencia de un proveedor | Código estándar (Hono, Drizzle, Postgres) portable |
+
+## 10. Decisiones abiertas
+
+| # | Decisión | Estado |
+|---|---|---|
+| 1 | Permisos en la aplicación vs. RLS | Pendiente |
+| 2 | Multi-organización desde el esquema inicial | Recomendado: sí |
+| 3 | SSR (Remix / RR7) para páginas públicas | Pendiente |
+| 4 | Skill comunitaria de Drizzle | Opcional, revisar antes |
+| 5 | Crear la skill propia `condo-port` | Aplazada |
+| 6 | Integrar Jev como capa de decisión | Solo experimento (sección 6.1) |

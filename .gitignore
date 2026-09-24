@@ -1,0 +1,23 @@
+# Secretos: nunca en el repositorio
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+credentials.json
+
+# Dependencias y artefactos
+node_modules/
+dist/
+.wrangler/
+.clawnify/
+
+# Sistema y logs
+.DS_Store
+Thumbs.db
+*.log
+
+# Supabase CLI
+supabase/.temp/

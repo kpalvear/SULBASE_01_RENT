@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "cloudflare": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/cloudflare/SKILL.md",
+      "computedHash": "0f8ee2a0c5de3cce6cd610bad1c3ea1666d85425ac8cf44d6bf18eb1e93fa974"
+    },
+    "hono": {
+      "source": "honojs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/hono/SKILL.md",
+      "computedHash": "07087a62dcd9a4c43cdb4f12b6a764739c67d49768fc822f702061ef5056e168"
+    },
+    "supabase": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase/SKILL.md",
+      "computedHash": "9d45a22644459dcd64a67c98301a3fa4901d369be0824d892919344bfe0c9014"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
+    "workers-best-practices": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/workers-best-practices/SKILL.md",
+      "computedHash": "7764ccc81dca3f9b4289817879464608eb1bd73cd607347d43ab5c1697a4b707"
+    },
+    "wrangler": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/wrangler/SKILL.md",
+      "computedHash": "ad58885bd4e7e146e67eacc9fba35ff3a8d6ee3ee1ea46ea8603b81caa2a9c0a"
+    }
+  }
+}
