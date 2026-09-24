@@ -67,15 +67,15 @@ La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte 
 - **Validación con Zod en cada endpoint.**
 - **Rate limiting** en endpoints públicos y de autenticación (mecanismo de Cloudflare o middleware; verificar opciones vigentes).
 - **Secretos** solo en el gestor de entorno (`wrangler secret put`), nunca en el repositorio.
-- **Costos:** configurar alertas de uso y gasto en Cloudflare y Supabase el día 1 (verificar qué límites duros ofrece cada plan).
+- **Costos:** alertas de uso y gasto en Cloudflare el día 1. En Supabase no hay plan de pago: vigilar las cuotas del Free.
 
 ### 4.3 Persistencia
 - Supabase Postgres + Drizzle. Esquema en `src/db/schema.ts`.
 - **Migraciones versionadas en el repositorio** (`drizzle-kit generate`); prohibido modificar el esquema a mano en producción.
 - Migraciones aplicadas desde CI o local, nunca desde el Worker.
-- Usar la URL con pooling (Hyperdrive o pooler de Supabase).
-- Verificar que el plan incluya **backups y PITR** y probar una restauración antes del lanzamiento.
-- Staging con proyecto/base de datos separado de producción.
+- Usar la URL con pooling (Hyperdrive o el pooler de Supabase, puerto 6543).
+- **Plan Free de Supabase, sin gasto.** Como máximo dos proyectos activos: desarrollo y producción. No hay backups automáticos ni PITR. La copia de seguridad es un `db dump` periódico, guardado fuera del repositorio, y hay que probar una restauración antes del lanzamiento. Un proyecto Free se pausa tras una semana sin actividad.
+- Lab, preview y staging usan el proyecto de desarrollo. Producción es el otro proyecto Free.
 
 ### 4.4 Multi-organización y permisos
 - Añadir `organization_id` (not null) a las tablas principales y una tabla `memberships` con rol.
@@ -99,9 +99,9 @@ La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte 
 | Entorno | Frontend | Backend | Base de datos |
 |---|---|---|---|
 | Local | Vite dev | `wrangler dev` | Postgres local o proyecto de desarrollo |
-| Lab / Preview | Preview URL | Worker `dev` | Proyecto Supabase de desarrollo |
-| Staging | Preview/Staging | Worker staging | BD de staging |
-| Producción | Cloudflare | Worker prod | BD de producción |
+| Lab / Preview | Preview URL | Worker `dev` | Proyecto Supabase Free de desarrollo |
+| Staging | Preview/Staging | Worker staging | Mismo proyecto Free de desarrollo |
+| Producción | Cloudflare | Worker prod | Proyecto Supabase Free de producción |
 
 ## 6. Laboratorio de experimentos
 
@@ -160,8 +160,8 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 ### Fase 0 — Preparación
 - [x] Skills instaladas y detectadas por Cursor
-- [ ] Repositorio con `main` protegida y este `AGENTS.md` en la raíz
-- [ ] Proyecto Supabase creado (desarrollo y staging); pooling y PITR verificados
+- [ ] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
+- [ ] Dos proyectos Supabase Free (desarrollo y producción); pooler verificado. Sin PITR ni backups de pago
 - [ ] Proyecto Cloudflare conectado al repo (Preview URLs activas)
 - [ ] Alertas de costo y de errores configuradas
 - [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
@@ -193,7 +193,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [ ] CI: typecheck, lint, tests, build, escaneo de secretos
 - [ ] Despliegue del Worker a staging y luego a producción
 - [ ] Rate limiting en endpoints públicos y de autenticación
-- [ ] Restauración de backup probada de punta a punta
+- [ ] Restauración probada desde un `db dump` (el plan Free no incluye backups automáticos ni PITR)
 
 ### Fase 6 — SEO y GEO (si hay páginas públicas)
 - [ ] Decisión sobre SSR con Remix / React Router v7
@@ -208,7 +208,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 ## 8. Checklist previo al lanzamiento
 
-- [ ] Restauración de backup probada
+- [ ] Restauración probada desde un volcado manual (`db dump`)
 - [ ] Rate limiting y validación de entrada revisados
 - [ ] Prueba de carga básica sobre la API
 - [ ] Aislamiento entre organizaciones verificado
@@ -218,8 +218,8 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 | Riesgo | Control |
 |---|---|
-| Gasto descontrolado | Alertas y límites en Cloudflare y Supabase |
-| Pérdida de datos | Backups + PITR + restauración probada |
+| Gasto descontrolado | Supabase permanece en Free. Alertas y límites en Cloudflare. Vigilar cuotas del Free (500 MB, egress, pausa a los 7 días) |
+| Pérdida de datos | Volcado manual fuera del repo y restauración probada. El plan Free no tiene backups automáticos ni PITR |
 | Bug por cambio de API | Hono RPC + typecheck en CI |
 | Abuso de tráfico | Rate limiting + protección de Cloudflare |
 | Secretos expuestos | Gestor de entorno + escaneo en CI |
@@ -237,3 +237,4 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 | 4 | Skill comunitaria de Drizzle | Opcional, revisar antes |
 | 5 | Crear la skill propia `condo-port` | Aplazada |
 | 6 | Integrar Jev como capa de decisión | Solo experimento (sección 6.1) |
+| 7 | Plan de Supabase | Cerrado: Free para siempre. Sin PITR ni backups de pago. Dos proyectos activos: desarrollo y producción |
