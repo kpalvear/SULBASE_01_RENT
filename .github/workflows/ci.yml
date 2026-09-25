@@ -1,3 +1,5 @@
+# Producción edge: push a main → verify + deploy (secrets CLOUDFLARE_*).
+# Preview en PR → job preview. No duplicar con Workers Builds en el dashboard de rent.
 name: CI
 
 on:
