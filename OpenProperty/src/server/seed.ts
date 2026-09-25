@@ -48,17 +48,72 @@ const DEMO_UNITS: Array<{
   marketRent: string;
   status: "vacant" | "occupied";
 }> = [
-  { propertyIndex: 0, name: "Main house", bedrooms: "3", bathrooms: "2", sqft: 1450, marketRent: "2300", status: "occupied" },
-  { propertyIndex: 1, name: "Main house", bedrooms: "2", bathrooms: "1", sqft: 980, marketRent: "1700", status: "occupied" },
-  { propertyIndex: 2, name: "Unit 1", bedrooms: "1", bathrooms: "1", sqft: 620, marketRent: "1450", status: "occupied" },
-  { propertyIndex: 2, name: "Unit 2", bedrooms: "1", bathrooms: "1", sqft: 620, marketRent: "1450", status: "vacant" },
-  { propertyIndex: 2, name: "Unit 3", bedrooms: "2", bathrooms: "1", sqft: 850, marketRent: "1850", status: "occupied" },
+  {
+    propertyIndex: 0,
+    name: "Main house",
+    bedrooms: "3",
+    bathrooms: "2",
+    sqft: 1450,
+    marketRent: "2300",
+    status: "occupied",
+  },
+  {
+    propertyIndex: 1,
+    name: "Main house",
+    bedrooms: "2",
+    bathrooms: "1",
+    sqft: 980,
+    marketRent: "1700",
+    status: "occupied",
+  },
+  {
+    propertyIndex: 2,
+    name: "Unit 1",
+    bedrooms: "1",
+    bathrooms: "1",
+    sqft: 620,
+    marketRent: "1450",
+    status: "occupied",
+  },
+  {
+    propertyIndex: 2,
+    name: "Unit 2",
+    bedrooms: "1",
+    bathrooms: "1",
+    sqft: 620,
+    marketRent: "1450",
+    status: "vacant",
+  },
+  {
+    propertyIndex: 2,
+    name: "Unit 3",
+    bedrooms: "2",
+    bathrooms: "1",
+    sqft: 850,
+    marketRent: "1850",
+    status: "occupied",
+  },
 ];
 
 const DEMO_VENDORS = [
-  { name: "Emerald Pool Service", category: "general" as const, phone: "512-555-0144", color: "emerald" },
-  { name: "Hill Country Plumbing", category: "plumber" as const, phone: "512-555-0188", color: "sky" },
-  { name: "Bright Spark Electric", category: "electrician" as const, phone: "512-555-0102", color: "amber" },
+  {
+    name: "Emerald Pool Service",
+    category: "general" as const,
+    phone: "512-555-0144",
+    color: "emerald",
+  },
+  {
+    name: "Hill Country Plumbing",
+    category: "plumber" as const,
+    phone: "512-555-0188",
+    color: "sky",
+  },
+  {
+    name: "Bright Spark Electric",
+    category: "electrician" as const,
+    phone: "512-555-0102",
+    color: "amber",
+  },
 ];
 
 let seeded = false;

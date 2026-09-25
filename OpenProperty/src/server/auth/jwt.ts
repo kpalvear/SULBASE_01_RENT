@@ -57,7 +57,7 @@ export async function verifySupabaseAccessToken(
     /* fall through */
   }
 
-  if (issuer && issuer.includes("supabase.co")) {
+  if (issuer?.includes("supabase.co")) {
     try {
       return await verifyWithJwks(token, issuer);
     } catch {

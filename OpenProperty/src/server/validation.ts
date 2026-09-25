@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { z } from "zod";
+import type { z } from "zod";
 import type { AppEnv } from "./env";
 
 export async function parseJson<T>(
@@ -16,9 +16,7 @@ export async function parseJson<T>(
   if (!parsed.success) {
     return {
       ok: false,
-      error: parsed.error.issues
-        .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; "),
+      error: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
     };
   }
   return { ok: true, data: parsed.data };

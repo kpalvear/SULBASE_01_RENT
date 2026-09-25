@@ -195,10 +195,10 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [ ] Tests de integración API de aislamiento entre organizaciones
 
 ### Fase 5 — CI y despliegue
-- [ ] CI: typecheck, lint, tests, build, escaneo de secretos
-- [ ] Despliegue del Worker a staging y luego a producción
-- [ ] Rate limiting en endpoints públicos y de autenticación
-- [ ] Restauración probada desde un `db dump` (el plan Free no incluye backups automáticos ni PITR)
+- [x] CI: typecheck, lint (`biome` en `src/server`), tests, build, escaneo de secretos (`gitleaks`)
+- [x] Staging = preview Worker en PR (`preview` job); producción = push a `main` (`deploy` job) — ver §5
+- [x] Rate limiting en `/api/*` y rutas auth-adjacentes (`/api/me`, `/api/auth/*`) — ver `src/server/auth/rate-limit.ts`
+- [ ] Restauración probada desde un `db dump` (procedimiento en `OpenProperty/docs/db-backup-restore.md`; ejecutar en lab)
 
 ### Fase 6 — SEO y GEO (si hay páginas públicas)
 - [ ] Decisión sobre SSR con Remix / React Router v7

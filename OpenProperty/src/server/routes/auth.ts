@@ -4,11 +4,7 @@ import type { Hono } from "hono";
 import { memberships, organizations } from "../../db/schema";
 import type { AppEnv } from "../env";
 import { reconcileMembershipsByEmail } from "../auth/reconcile-memberships";
-import {
-  listMemberships,
-  resolveTenant,
-  slugifyOrganizationName,
-} from "../auth/tenant";
+import { listMemberships, resolveTenant, slugifyOrganizationName } from "../auth/tenant";
 import { parseJson } from "../validation";
 import { uuidSchema } from "../schemas/common";
 import type { Context } from "hono";
@@ -27,7 +23,10 @@ const BootstrapBody = z.object({
   name: z.string().min(1).max(120),
   slug: z
     .string()
-    .regex(/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/, "slug must be lowercase alphanumeric with hyphens")
+    .regex(
+      /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/,
+      "slug must be lowercase alphanumeric with hyphens",
+    )
     .optional(),
 });
 
