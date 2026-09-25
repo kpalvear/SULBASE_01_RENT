@@ -10,6 +10,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { api } from "../api";
 import { getEmailRedirectUrl } from "../lib/auth-redirect";
+import { establishSessionFromUrl } from "../lib/auth-session";
 import { authConfigured, getSupabase } from "../lib/supabase";
 import { getStoredOrganizationId, setStoredOrganizationId } from "../lib/session";
 
@@ -55,8 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     if (!supabase) return;
 
-    const { data } = await supabase.auth.getSession();
-    const current = data.session;
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const current = userData.user ? sessionData.session : null;
     setSession(current);
 
     if (!current) {
@@ -100,11 +102,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setOrganizationId(active);
-      setRole(me.role);
+      setRole(me.role ?? (active && me.memberships.length === 1 ? me.memberships[0].role : null));
     } catch {
       setMemberships([]);
       setOrganizationId(null);
       setRole(null);
+      setStoredOrganizationId(null);
     } finally {
       setLoading(false);
     }
@@ -117,11 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const supabase = getSupabase()!;
     void (async () => {
-      // Email confirmation puts tokens in the URL hash; wait for Supabase to persist session.
-      const { data } = await supabase.auth.getSession();
-      if (!data.session && window.location.hash.includes("access_token")) {
-        await new Promise((r) => setTimeout(r, 300));
-      }
+      await establishSessionFromUrl(supabase);
       await refreshProfile();
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -185,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (name: string) => {
       const supabase = getSupabase();
       if (!supabase) throw new Error("Auth not configured");
+      await establishSessionFromUrl(supabase);
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (!accessToken) throw new Error("Sign in required");

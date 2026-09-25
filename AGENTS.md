@@ -94,6 +94,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 - **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Producción (edge):** solo **GitHub Actions** — cada push a `main` → jobs `verify` luego `deploy` en `.github/workflows/ci.yml` (`npm run build` + `npm run deploy` desde la raíz del repo; secrets `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`). URL: `https://rent.sistemas-d5d.workers.dev`. **Preview antes de merge:** job `preview` en pull requests (`wrangler preview`). **No usar Workers Builds** en este repo (desconectar Git en el dashboard del Worker `rent` → Settings → Build) para evitar doble deploy y un segundo token; otros proyectos de la cuenta pueden seguir con Builds. D1 solo en `wrangler dev -e local` hasta Fase 2. Secretos de app: `wrangler secret put`, nunca en git.
 - **Postgres en producción:** el deploy de GitHub **no** configura la base de datos. Tras el primer deploy (o al cambiar de proyecto Supabase), ejecutar `wrangler secret put DATABASE_URL` con la URL del **transaction pooler** de Supabase (puerto **6543**, `?pgbouncer=true`). Sin ese secreto, el Worker arranca pero `/api/*` falla al conectar. En local, copiar `OpenProperty/.dev.vars.example` → `.dev.vars` con la misma URL. Las migraciones Drizzle se aplican **fuera** del Worker (local o CI dedicado), no en el job `deploy`.
 - **Auth en producción:** `wrangler secret put SUPABASE_JWT_SECRET` (JWT Secret del proyecto). Sin secret ni bypass, `/api/*` responde 401. Local sin login: `AUTH_DEV_BYPASS=true` en `.dev.vars` **solo** si no hay `SUPABASE_JWT_SECRET`. Frontend: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `.env` para Vite.
+- **Local Modo B (auth como prod):** en `OpenProperty/`, `.env` con Supabase + `DATABASE_POOLED_URL`; `copy .env.local.example .env.local`; `pnpm run dev:auth` (genera `.dev.vars` y arranca Vite + `wrangler dev` en `http://localhost:5173`). Supabase Redirect URLs: `http://localhost:5173/**`.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
@@ -190,7 +191,8 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Supabase Auth integrado (cliente + JWT en Worker)
 - [x] `organizations` + `memberships` con roles (onboarding + selector de org)
 - [x] Todas las consultas filtradas por organización (vía middleware; no confiar en org del cliente)
-- [ ] Tests de aislamiento entre organizaciones (integración API; unitarios de roles en `pnpm test`)
+- [x] Tests unitarios de roles y selección de tenant (`roles.test.ts`, `tenant.test.ts`)
+- [ ] Tests de integración API de aislamiento entre organizaciones
 
 ### Fase 5 — CI y despliegue
 - [ ] CI: typecheck, lint, tests, build, escaneo de secretos

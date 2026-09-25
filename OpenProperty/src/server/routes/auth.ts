@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { memberships, organizations } from "../../db/schema";
 import type { AppEnv } from "../env";
+import { reconcileMembershipsByEmail } from "../auth/reconcile-memberships";
 import {
   listMemberships,
   resolveTenant,
@@ -10,6 +11,17 @@ import {
 } from "../auth/tenant";
 import { parseJson } from "../validation";
 import { uuidSchema } from "../schemas/common";
+import type { Context } from "hono";
+
+async function reconcileIfNeeded(c: Context<AppEnv>): Promise<void> {
+  const userId = c.get("userId");
+  const email = c.get("userEmail");
+  if (!userId || !email) return;
+  const db = c.get("db");
+  const current = await listMemberships(db, userId);
+  if (current.length > 0) return;
+  await reconcileMembershipsByEmail(c.get("sql"), userId, email);
+}
 
 const BootstrapBody = z.object({
   name: z.string().min(1).max(120),
@@ -33,6 +45,7 @@ export function mountAuthRoutes(app: Hono<AppEnv>) {
     }
 
     const db = c.get("db");
+    await reconcileIfNeeded(c);
     const membershipsList = await listMemberships(db, userId);
     const requestedOrg = c.req.header("X-Organization-Id");
     const tenant = await resolveTenant(
@@ -65,9 +78,19 @@ export function mountAuthRoutes(app: Hono<AppEnv>) {
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
     const db = c.get("db");
+    await reconcileIfNeeded(c);
     const existing = await listMemberships(db, userId);
     if (existing.length > 0) {
-      return c.json({ error: "Account already belongs to an organization" }, 409);
+      const first = existing[0];
+      return c.json({
+        organization: {
+          id: first.organizationId,
+          name: first.organizationName,
+          slug: first.organizationSlug,
+        },
+        role: first.role,
+        already_member: true,
+      });
     }
 
     const name = parsed.data.name.trim();

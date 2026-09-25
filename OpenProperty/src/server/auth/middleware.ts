@@ -43,6 +43,7 @@ export const authMiddleware = factory.createMiddleware(async (c, next) => {
     const slug = c.env.DEV_ORGANIZATION_SLUG ?? "dev";
     const oid = await resolveOrganizationId(db, slug);
     c.set("userId", null);
+    c.set("userEmail", null);
     c.set("orgId", oid);
     c.set("role", "owner");
     await ensureSeeded(db, oid);
@@ -62,6 +63,7 @@ export const authMiddleware = factory.createMiddleware(async (c, next) => {
   }
 
   c.set("userId", user.sub);
+  c.set("userEmail", user.email ?? null);
 
   if (JWT_ONLY_PATHS.has(path)) {
     return next();

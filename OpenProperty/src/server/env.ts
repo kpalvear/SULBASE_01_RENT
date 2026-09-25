@@ -20,6 +20,7 @@ export type WorkerVariables = {
   sql: Sql;
   db: AppDb;
   userId: string | null;
+  userEmail: string | null;
   role: MembershipRole;
 };
 

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n ui,api -c cyan,green \"vite\" \"wrangler dev --port 8787\"",
+    "prepare:local-auth": "node scripts/prepare-local-auth.mjs",
+    "dev:auth": "node scripts/prepare-local-auth.mjs && pnpm dev",
     "db:migrate:d1": "wrangler d1 execute open-property-db --local --file=src/server/schema.sql",
     "db:pg:generate": "drizzle-kit generate",
     "db:pg:migrate": "drizzle-kit migrate",
