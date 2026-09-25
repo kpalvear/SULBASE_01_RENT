@@ -41,18 +41,22 @@ export type ResolvedTenant = {
 /**
  * Pick active org from header or sole membership. Never trusts org id without a membership row.
  */
-export async function resolveTenant(
-  db: AppDb,
-  userId: string,
+export function pickTenantFromMemberships(
+  all: MembershipRow[],
   requestedOrgId: string | null,
-): Promise<ResolvedTenant | null> {
-  const all = await listMemberships(db, userId);
+): ResolvedTenant | null {
   if (all.length === 0) return null;
 
   if (requestedOrgId) {
     const match = all.find((m) => m.organizationId === requestedOrgId);
-    if (!match) return null;
-    return { organizationId: match.organizationId, role: match.role };
+    if (match) {
+      return { organizationId: match.organizationId, role: match.role };
+    }
+    // Stale X-Organization-Id header — fall back if unambiguous.
+    if (all.length === 1) {
+      return { organizationId: all[0].organizationId, role: all[0].role };
+    }
+    return null;
   }
 
   if (all.length === 1) {
@@ -60,6 +64,15 @@ export async function resolveTenant(
   }
 
   return null;
+}
+
+export async function resolveTenant(
+  db: AppDb,
+  userId: string,
+  requestedOrgId: string | null,
+): Promise<ResolvedTenant | null> {
+  const all = await listMemberships(db, userId);
+  return pickTenantFromMemberships(all, requestedOrgId);
 }
 
 export function slugifyOrganizationName(name: string): string {
