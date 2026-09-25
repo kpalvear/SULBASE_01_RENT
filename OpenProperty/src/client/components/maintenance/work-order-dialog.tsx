@@ -13,7 +13,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workOrder?: WorkOrder;
-  defaults?: { property_id?: number; unit_id?: number };
+  defaults?: { property_id?: string; unit_id?: string };
   onSaved?: () => void;
 }
 
@@ -36,9 +36,9 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
   const app = useApp();
   const [units, setUnits] = useState<Unit[]>([]);
   const [confirming, setConfirming] = useState(false);
-  const [propertyId, setPropertyId] = useState<number | "">("");
-  const [unitId, setUnitId] = useState<number | "">("");
-  const [vendorId, setVendorId] = useState<number | "">("");
+  const [propertyId, setPropertyId] = useState<string | "">("");
+  const [unitId, setUnitId] = useState<string | "">("");
+  const [vendorId, setVendorId] = useState<string | "">("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<WorkOrderPriority>("normal");
@@ -76,13 +76,13 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
 
   const filteredUnits = useMemo(() => {
     if (!propertyId) return units;
-    return units.filter((u) => u.property_id === Number(propertyId));
+    return units.filter((u) => u.property_id === propertyId);
   }, [units, propertyId]);
 
   // Auto-set property when picking a unit.
   useEffect(() => {
     if (!unitId) return;
-    const u = units.find((x) => x.id === Number(unitId));
+    const u = units.find((x) => x.id === unitId);
     if (u && propertyId !== u.property_id) setPropertyId(u.property_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unitId]);
@@ -92,9 +92,9 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
     setSaving(true);
     try {
       const payload = {
-        property_id: propertyId ? Number(propertyId) : null,
-        unit_id: unitId ? Number(unitId) : null,
-        vendor_id: vendorId ? Number(vendorId) : null,
+        property_id: propertyId || null,
+        unit_id: unitId || null,
+        vendor_id: vendorId || null,
         title: title.trim(),
         description: description.trim() || null,
         priority,
@@ -144,7 +144,7 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Property</Label>
-              <Select value={String(propertyId || "")} onValueChange={(v) => { setPropertyId(v ? Number(v) : ""); setUnitId(""); }}>
+              <Select value={String(propertyId || "")} onValueChange={(v) => { setPropertyId(v || ""); setUnitId(""); }}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   {app.properties.map((p) => (
@@ -155,7 +155,7 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
             </div>
             <div>
               <Label>Unit</Label>
-              <Select value={String(unitId || "")} onValueChange={(v) => setUnitId(v ? Number(v) : "")}>
+              <Select value={String(unitId || "")} onValueChange={(v) => setUnitId(v || "")}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   {filteredUnits.map((u) => (
@@ -190,7 +190,7 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
             </div>
             <div>
               <Label>Vendor</Label>
-              <Select value={String(vendorId || "")} onValueChange={(v) => setVendorId(v ? Number(v) : "")}>
+              <Select value={String(vendorId || "")} onValueChange={(v) => setVendorId(v || "")}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   {app.vendors.map((v) => (

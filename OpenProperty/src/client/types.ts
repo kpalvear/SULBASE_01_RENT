@@ -3,7 +3,7 @@
 export type PropertyType = "single_family" | "multi_family" | "condo" | "townhouse" | "commercial";
 
 export interface Property {
-  id: number;
+  id: string;
   name: string;
   type: PropertyType;
   address: string | null;
@@ -22,8 +22,8 @@ export interface Property {
 export type UnitStatus = "vacant" | "occupied" | "turnover" | "unavailable";
 
 export interface Unit {
-  id: number;
-  property_id: number;
+  id: string;
+  property_id: string;
   name: string;
   bedrooms: number;
   bathrooms: number;
@@ -37,12 +37,12 @@ export interface Unit {
   property_color?: string | null;
   property_address?: string | null;
   property_city?: string | null;
-  active_lease_id?: number | null;
+  active_lease_id?: string | null;
   active_tenant_name?: string | null;
 }
 
 export interface Tenant {
-  id: number;
+  id: string;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -54,7 +54,7 @@ export interface Tenant {
   notes: string | null;
   created_at: string;
   // Joined (active lease)
-  active_unit_id?: number | null;
+  active_unit_id?: string | null;
   active_unit_name?: string | null;
   active_property_name?: string | null;
 }
@@ -62,9 +62,9 @@ export interface Tenant {
 export type LeaseStatus = "upcoming" | "active" | "ended" | "cancelled";
 
 export interface Lease {
-  id: number;
-  unit_id: number;
-  primary_tenant_id: number | null;
+  id: string;
+  unit_id: string;
+  primary_tenant_id: string | null;
   start_date: string;
   end_date: string;
   monthly_rent: number;
@@ -76,7 +76,7 @@ export interface Lease {
   created_at: string;
   // Joined
   unit_name?: string | null;
-  property_id?: number | null;
+  property_id?: string | null;
   property_name?: string | null;
   property_color?: string | null;
   tenant_first_name?: string | null;
@@ -88,8 +88,8 @@ export interface Lease {
 export type ChargeStatus = "open" | "partial" | "paid" | "overdue" | "waived";
 
 export interface RentCharge {
-  id: number;
-  lease_id: number;
+  id: string;
+  lease_id: string;
   period: string;
   due_date: string;
   amount: number;
@@ -98,14 +98,14 @@ export interface RentCharge {
   notes: string | null;
   created_at: string;
   // Joined
-  unit_id?: number | null;
+  unit_id?: string | null;
   lease_rent?: number | null;
   rent_due_day?: number | null;
   unit_name?: string | null;
-  property_id?: number | null;
+  property_id?: string | null;
   property_name?: string | null;
   property_color?: string | null;
-  tenant_id?: number | null;
+  tenant_id?: string | null;
   tenant_first_name?: string | null;
   tenant_last_name?: string | null;
 }
@@ -113,8 +113,8 @@ export interface RentCharge {
 export type PaymentMethod = "cash" | "check" | "ach" | "credit" | "other";
 
 export interface Payment {
-  id: number;
-  charge_id: number;
+  id: string;
+  charge_id: string;
   paid_at: string;
   amount: number;
   method: PaymentMethod;
@@ -125,7 +125,7 @@ export interface Payment {
 export type VendorCategory = "plumber" | "electrician" | "hvac" | "handyman" | "cleaning" | "landscaping" | "general";
 
 export interface Vendor {
-  id: number;
+  id: string;
   name: string;
   category: VendorCategory;
   phone: string | null;
@@ -139,11 +139,11 @@ export type WorkOrderPriority = "low" | "normal" | "high" | "urgent";
 export type WorkOrderStatus = "open" | "assigned" | "in_progress" | "completed" | "cancelled";
 
 export interface WorkOrder {
-  id: number;
-  property_id: number | null;
-  unit_id: number | null;
-  tenant_id: number | null;
-  vendor_id: number | null;
+  id: string;
+  property_id: string | null;
+  unit_id: string | null;
+  tenant_id: string | null;
+  vendor_id: string | null;
   title: string;
   description: string | null;
   priority: WorkOrderPriority;
@@ -166,8 +166,8 @@ export interface WorkOrder {
 export type ApplicationStatus = "new" | "screening" | "approved" | "declined" | "withdrawn";
 
 export interface Application {
-  id: number;
-  unit_id: number | null;
+  id: string;
+  unit_id: string | null;
   first_name: string;
   last_name: string;
   email: string | null;
@@ -198,11 +198,11 @@ export interface DashboardSummary {
   open_work_orders: number;
   urgent_work_orders: number;
   recent_work_orders: {
-    id: number; title: string; priority: string; status: string;
+    id: string; title: string; priority: string; status: string;
     property_name: string | null; unit_name: string | null; created_at: string;
   }[];
   upcoming_expirations: {
-    id: number; end_date: string;
+    id: string; end_date: string;
     tenant_first_name: string | null; tenant_last_name: string | null;
     unit_name: string | null; property_name: string | null;
   }[];
@@ -211,9 +211,9 @@ export interface DashboardSummary {
 // ── Input types for mutations ──────────────────────────────────────
 
 export type NewProperty = Partial<Omit<Property, "id" | "created_at" | "unit_count" | "occupied_count">> & { name: string };
-export type NewUnit = Partial<Omit<Unit, "id" | "created_at" | "property_name" | "property_color" | "property_address" | "property_city" | "active_lease_id" | "active_tenant_name">> & { property_id: number; name: string };
+export type NewUnit = Partial<Omit<Unit, "id" | "created_at" | "property_name" | "property_color" | "property_address" | "property_city" | "active_lease_id" | "active_tenant_name">> & { property_id: string; name: string };
 export type NewTenant = Partial<Omit<Tenant, "id" | "created_at" | "active_unit_id" | "active_unit_name" | "active_property_name">> & { first_name: string; last_name: string };
-export type NewLease = Partial<Omit<Lease, "id" | "created_at" | "unit_name" | "property_id" | "property_name" | "property_color" | "tenant_first_name" | "tenant_last_name" | "tenant_email" | "tenant_phone">> & { unit_id: number; start_date: string; end_date: string };
+export type NewLease = Partial<Omit<Lease, "id" | "created_at" | "unit_name" | "property_id" | "property_name" | "property_color" | "tenant_first_name" | "tenant_last_name" | "tenant_email" | "tenant_phone">> & { unit_id: string; start_date: string; end_date: string };
 export type NewWorkOrder = Partial<Omit<WorkOrder, "id" | "created_at" | "property_name" | "property_color" | "unit_name" | "tenant_first_name" | "tenant_last_name" | "vendor_name" | "vendor_color">> & { title: string };
 export type NewVendor = Partial<Omit<Vendor, "id" | "created_at">> & { name: string };
 export type NewApplication = Partial<Omit<Application, "id" | "created_at" | "unit_name" | "property_name">> & { first_name: string; last_name: string };

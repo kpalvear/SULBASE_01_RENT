@@ -30,7 +30,7 @@ export function PaymentDialog({ open, onOpenChange, charge, onSaved }: Props) {
   const app = useApp();
   const [amount, setAmount] = useState("0");
   /** The payment awaiting confirmation — its id is the open state. */
-  const [confirming, setConfirming] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("ach");
   const [paidAt, setPaidAt] = useState(toIsoDate(new Date()));
   const [reference, setReference] = useState("");
@@ -79,7 +79,7 @@ export function PaymentDialog({ open, onOpenChange, charge, onSaved }: Props) {
     }
   }
 
-  async function deletePayment(id: number) {
+  async function deletePayment(id: string) {
     try {
       await api("DELETE", `/api/payments/${id}`);
       setHistory((prev) => prev.filter((p) => p.id !== id));

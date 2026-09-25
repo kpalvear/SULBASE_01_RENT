@@ -10,7 +10,7 @@ import { TenantDialog } from "./tenant-dialog";
 import type { Lease, Tenant } from "@/types";
 import { PageShell } from "@/components/page-shell";
 
-export function TenantPage({ id, navigate }: { id: number; navigate: (to: string) => void }) {
+export function TenantPage({ id, navigate }: { id: string; navigate: (to: string) => void }) {
   const app = useApp();
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [leases, setLeases] = useState<Lease[]>([]);

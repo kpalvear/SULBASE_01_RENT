@@ -12,7 +12,7 @@ import type { Unit, UnitStatus } from "@/types";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  propertyId: number;
+  propertyId: string;
   unit?: Unit;
   onSaved?: () => void;
 }

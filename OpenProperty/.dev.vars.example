@@ -1,0 +1,9 @@
+# Copia a `.dev.vars` (gitignored). Wrangler carga esto en `wrangler dev`.
+# Usa el pooler de transacciones de Supabase (puerto 6543), no el 5432 de migraciones.
+DATABASE_URL="postgres://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+
+# Supabase → Project Settings → API → JWT Secret (validates Bearer tokens in the Worker)
+SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
+
+# Optional: keep single-tenant dev without login (only when SUPABASE_JWT_SECRET is unset)
+# AUTH_DEV_BYPASS="true"

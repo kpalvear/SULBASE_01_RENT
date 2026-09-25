@@ -13,21 +13,12 @@ import { LeasesPage } from "./components/leases/leases-page";
 import { RentPage } from "./components/rent/rent-page";
 import { MaintenancePage } from "./components/maintenance/maintenance-page";
 import { SettingsPage } from "./components/settings/settings-page";
+import { authConfigured } from "./lib/supabase";
+import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { LoginPage } from "./components/auth/login-page";
+import { OrgGatePage } from "./components/auth/org-gate-page";
 
-/**
- * The navigation, defined once.
- *
- * Opened directly, <AppNav> paints this as the app's own rail; inside the
- * Clawnify dashboard it paints nothing and hands the same list to the host, so
- * the user sees one nav rather than two. Every record type owns a colour and
- * keeps it on its tile wherever the type appears.
- *
- * Icons come from the platform's TILE_ICONS library — a name outside it draws
- * as a plain dot in the dashboard.
- */
 const PORTFOLIO: AppNavItem[] = [
-  // Not drawn as a row: the app's name opens it (the brand row standalone, the
-  // app's own header in the dashboard).
   { id: "dashboard", label: "Dashboard", href: "/dashboard", home: true },
   { id: "properties", label: "Properties", href: "/properties", icon: "building-2", color: "green" },
   { id: "tenants", label: "Tenants", href: "/tenants", icon: "users", color: "blue" },
@@ -41,7 +32,6 @@ const ADMIN: AppNavItem[] = [
   { id: "settings", label: "Settings", href: "/settings", icon: "settings" },
 ];
 
-/** A record page keeps its collection's row lit. */
 function activeFor(route: Route): string {
   if (route.name === "property") return "properties";
   if (route.name === "tenant") return "tenants";
@@ -49,10 +39,40 @@ function activeFor(route: Route): string {
 }
 
 export function App() {
+  return (
+    <AuthProvider>
+      <AppRoot />
+    </AuthProvider>
+  );
+}
+
+function AppRoot() {
+  const auth = useAuth();
+
+  if (authConfigured) {
+    if (auth.loading) {
+      return (
+        <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+          Loading…
+        </div>
+      );
+    }
+    if (!auth.session && !auth.devBypass) {
+      return <LoginPage />;
+    }
+    if (auth.session && !auth.devBypass && !auth.organizationId) {
+      return <OrgGatePage />;
+    }
+  }
+
+  return <AuthenticatedShell />;
+}
+
+function AuthenticatedShell() {
   const state = useAppState();
   const { path, route, navigate } = useRouter();
+  const auth = useAuth();
 
-  // Lets the dashboard restore this exact screen on reload.
   useEffect(() => {
     reportLocation(path);
   }, [path]);
@@ -66,9 +86,6 @@ export function App() {
   return (
     <AppContext.Provider value={state}>
       <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground md:flex-row">
-        {/* flex, so the SDK's <aside> stretches to the row height as a direct
-            child would. Below md the SDK lays it out as a scrolling strip, which
-            the flex-col above puts ABOVE the content rather than beside it. */}
         <div className="flex shrink-0">
           <AppNav
             title="OpenProperty"
@@ -79,6 +96,14 @@ export function App() {
           />
         </div>
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {auth.session && auth.organizationId && (
+            <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
+              <span>{auth.role}</span>
+              <button type="button" className="underline" onClick={() => void auth.signOut()}>
+                Sign out
+              </button>
+            </div>
+          )}
           {state.loading ? (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
               Loading…
