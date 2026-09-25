@@ -91,7 +91,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 ## 5. Flujo de trabajo
 
 - **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
-- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Workers Builds** (repo sulbase/RENT): raíz **`/`** (vacío), **Build command** `npm run build`, **Deploy command** `npm run deploy` (no dejar el default `npx wrangler deploy` en la raíz: no hay `wrangler.toml` ahí). Alternativa: raíz `OpenProperty`, build `npx pnpm@9 install --frozen-lockfile && npx pnpm@9 run build`, deploy `npx pnpm@9 exec wrangler deploy`. D1 solo en `wrangler dev -e local` hasta Fase 2. Preview en PR: GitHub Actions + secrets `CLOUDFLARE_*`. Secretos de app: `wrangler secret put`, nunca en git.
+- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Producción (edge):** cada **push a `main`** → job `deploy` en `.github/workflows/ci.yml` (`npm run build` + `npm run deploy`, secrets `CLOUDFLARE_*`) publica en `https://rent.sistemas-d5d.workers.dev`. Opcional: Workers Builds en el dashboard con los mismos comandos en `/`; si usas ambos, hay dos deploys por push (mejor dejar solo Actions o solo Builds). Preview en PR: job `preview`. D1 solo en `wrangler dev -e local` hasta Fase 2. Secretos de app: `wrangler secret put`, nunca en git.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
@@ -163,7 +163,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Skills instaladas y detectadas por Cursor
 - [x] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
 - [x] Proyecto Supabase Free de desarrollo creado; pooler (5432 y 6543) verificado. Sin PITR ni backups de pago
-- [ ] Proyecto Cloudflare conectado al repo (Workers Builds + Preview URLs); ver §5
+- [x] Proyecto Cloudflare conectado al repo (Workers Builds → `main` despliega `rent` en edge); ver §5
 - [ ] Alertas de costo y de errores configuradas
 - [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
 
