@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { api } from "../api";
+import { getEmailRedirectUrl } from "../lib/auth-redirect";
 import { authConfigured, getSupabase } from "../lib/supabase";
 import { getStoredOrganizationId, setStoredOrganizationId } from "../lib/session";
 
@@ -109,8 +110,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const supabase = getSupabase()!;
-    void refreshProfile();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => {
+    void (async () => {
+      // Pick up session from email confirmation / magic-link callback in the URL.
+      await supabase.auth.getSession();
+      await refreshProfile();
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
       void refreshProfile();
     });
     return () => sub.subscription.unsubscribe();
@@ -127,9 +133,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Auth not configured");
-    const { error } = await supabase.auth.signUp({ email, password });
+    const redirectTo = getEmailRedirectUrl();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: redirectTo },
+    });
     if (error) throw error;
-    await refreshProfile();
+    if (data.session) {
+      await refreshProfile();
+      return;
+    }
+    throw new Error(
+      `Account created. Check your email to confirm, then sign in. The link will return to ${redirectTo}`,
+    );
   }, [refreshProfile]);
 
   const signOut = useCallback(async () => {

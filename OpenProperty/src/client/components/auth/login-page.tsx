@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { parseAndClearAuthHashError } from "../../lib/auth-redirect";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -10,15 +11,36 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const hashError = parseAndClearAuthHashError();
+    if (hashError) {
+      setError(hashError);
+      setNotice("Request a new confirmation email from Supabase or sign up again after fixing redirect URLs.");
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setBusy(true);
     try {
       if (mode === "signin") await signIn(email, password);
-      else await signUp(email, password);
+      else {
+        try {
+          await signUp(email, password);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Sign up failed";
+          if (msg.includes("Check your email")) {
+            setNotice(msg);
+            return;
+          }
+          throw err;
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -59,6 +81,7 @@ export function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Sign up"}
