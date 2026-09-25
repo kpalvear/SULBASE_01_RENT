@@ -1,5 +1,7 @@
 # pnpm 11 reads build permissions from here, not from package.json's `pnpm`
 # field, which it ignores.
+packages:
+  - "."
 allowBuilds:
   esbuild: true
   workerd: true

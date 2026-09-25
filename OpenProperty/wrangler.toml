@@ -1,7 +1,14 @@
-name = "open-property"
+name = "rent"
 main = "src/server/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
+
+# SPA (Vite) + API Hono en /api/* — Fase 2 sustituye D1 por Supabase/Hyperdrive
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
 
 [[d1_databases]]
 binding = "DB"
