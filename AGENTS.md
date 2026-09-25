@@ -74,8 +74,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 - **Migraciones versionadas en el repositorio** (`drizzle-kit generate`); prohibido modificar el esquema a mano en producción.
 - Migraciones aplicadas desde CI o local, nunca desde el Worker.
 - Usar la URL con pooling (Hyperdrive o el pooler de Supabase, puerto 6543).
-- **Plan Free de Supabase, sin gasto.** Como máximo dos proyectos activos: desarrollo y producción. No hay backups automáticos ni PITR. La copia de seguridad es un `db dump` periódico, guardado fuera del repositorio, y hay que probar una restauración antes del lanzamiento. Un proyecto Free se pausa tras una semana sin actividad.
-- Lab, preview y staging usan el proyecto de desarrollo. Producción es el otro proyecto Free.
+- **Plan Free de Supabase, sin gasto.** Un solo proyecto activo hasta el lanzamiento (lab, preview, staging y desarrollo comparten la misma BD). Antes de producción real, crear un segundo proyecto Free solo para datos de usuarios (máximo dos activos en el plan). No hay backups automáticos ni PITR: copia con `db dump` fuera del repo y probar restauración. Un proyecto Free se pausa tras una semana sin actividad.
 
 ### 4.4 Multi-organización y permisos
 - Añadir `organization_id` (not null) a las tablas principales y una tabla `memberships` con rol.
@@ -91,7 +90,8 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 
 ## 5. Flujo de trabajo
 
-- **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`). Si el código sigue en `SULBASE_01_RENT` tras la transferencia: en GitHub (sesión sulbase) borra el repo vacío `RENT`, renombra `SULBASE_01_RENT` → `RENT`, luego `git remote set-url origin https://github.com/sulbase/RENT.git`.
+- **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
+- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). Conectar **Workers Builds** al repo con directorio raíz de build `OpenProperty`, comando `pnpm install && pnpm build`, deploy `pnpm exec wrangler deploy`. Preview por PR: `pnpm exec wrangler preview` (requiere `wrangler login` y token/API en CI). Secretos solo con `wrangler secret put`, nunca en git.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
@@ -102,7 +102,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 | Local | Vite dev | `wrangler dev` | Postgres local o proyecto de desarrollo |
 | Lab / Preview | Preview URL | Worker `dev` | Proyecto Supabase Free de desarrollo |
 | Staging | Preview/Staging | Worker staging | Mismo proyecto Free de desarrollo |
-| Producción | Cloudflare | Worker prod | Proyecto Supabase Free de producción |
+| Producción | Cloudflare | Worker prod | Segundo proyecto Supabase Free (solo antes del lanzamiento) |
 
 ## 6. Laboratorio de experimentos
 
@@ -163,8 +163,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Skills instaladas y detectadas por Cursor
 - [x] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
 - [x] Proyecto Supabase Free de desarrollo creado; pooler (5432 y 6543) verificado. Sin PITR ni backups de pago
-- [ ] Proyecto Supabase Free de producción (segundo proyecto activo del plan Free)
-- [ ] Proyecto Cloudflare conectado al repo (Preview URLs activas)
+- [ ] Proyecto Cloudflare conectado al repo (Workers Builds + Preview URLs); ver §5
 - [ ] Alertas de costo y de errores configuradas
 - [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
 
@@ -239,4 +238,5 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 | 4 | Skill comunitaria de Drizzle | Opcional, revisar antes |
 | 5 | Crear la skill propia `condo-port` | Aplazada |
 | 6 | Integrar Jev como capa de decisión | Solo experimento (sección 6.1) |
-| 7 | Plan de Supabase | Cerrado: Free para siempre. Sin PITR ni backups de pago. Dos proyectos activos: desarrollo y producción |
+| 7 | Plan de Supabase | Cerrado: Free para siempre. Sin PITR ni backups de pago. Un proyecto hasta lanzamiento; segundo solo para prod |
+| 8 | Segundo proyecto Supabase (prod) | Pendiente hasta pre-lanzamiento; no bloquea Fase 1 |
