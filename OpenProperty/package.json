@@ -37,7 +37,6 @@
     "clsx": "^2.1.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.6.0",
-    "hono-rate-limiter": "^0.5.4",
     "jose": "^6.2.12",
     "lucide-react": "^0.575.0",
     "postgres": "^3.4.7",
