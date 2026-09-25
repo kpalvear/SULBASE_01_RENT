@@ -192,7 +192,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] `organizations` + `memberships` con roles (onboarding + selector de org)
 - [x] Todas las consultas filtradas por organización (vía middleware; no confiar en org del cliente)
 - [x] Tests unitarios de roles y selección de tenant (`roles.test.ts`, `tenant.test.ts`)
-- [ ] Tests de integración API de aislamiento entre organizaciones
+- [x] Tests de integración API de aislamiento (`src/server/integration/org-isolation.test.ts`; ampliar a más rutas si hace falta)
 
 ### Fase 5 — CI y despliegue
 - [x] CI: typecheck, lint (`biome` en `src/server`), tests, build, escaneo de secretos (`gitleaks`)
@@ -215,9 +215,9 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 - [ ] Restauración probada desde un volcado manual (`db dump`)
 - [ ] Rate limiting y validación de entrada revisados
-- [ ] Prueba de carga básica sobre la API
-- [ ] Aislamiento entre organizaciones verificado
-- [ ] Plan de rollback documentado
+- [ ] Prueba de carga básica sobre la API (guía en `OpenProperty/docs/load-test.md`; ejecutar antes del lanzamiento)
+- [x] Aislamiento entre organizaciones verificado (tests de integración + revisión manual en lab)
+- [x] Plan de rollback documentado (`OpenProperty/docs/rollback.md`)
 
 ## 9. Control de riesgos
 
