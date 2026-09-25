@@ -1,4 +1,4 @@
-# AGENTS.md — SULBASE_01_RENT
+# AGENTS.md — RENT
 
 Plataforma de gestión de propiedades **100 % edge**: Cloudflare Workers + Supabase (Postgres), con Hono y Drizzle ORM.
 Este archivo es la fuente de verdad del proyecto. Cualquier asistente de IA debe leerlo antes de tocar código.
@@ -52,7 +52,7 @@ Copia de partida: [clawnify/OpenProperty](https://github.com/clawnify/OpenProper
 | `supabase-postgres-best-practices` | supabase/agent-skills (oficial) | Diseño y rendimiento de Postgres |
 
 Pendientes (no crear todavía): skill propia `condo-port` y, opcionalmente, una skill comunitaria de Drizzle (revisar su `SKILL.md` antes).
-La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte `.agents/skills/`.
+Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La carpeta local puede tener otro nombre; abre en Cursor la raíz que contiene `.agents/skills/`.
 
 ## 4. Arquitectura por capas
 
@@ -91,7 +91,7 @@ La carpeta raíz abierta en Cursor debe ser `SULBASE_01_RENT`, para que detecte 
 
 ## 5. Flujo de trabajo
 
-- **GitHub:** repositorio y operaciones (`gh`, push, PR) bajo la cuenta **[sulbase](https://github.com/sulbase)** — no la personal `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
+- **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`). Si el código sigue en `SULBASE_01_RENT` tras la transferencia: en GitHub (sesión sulbase) borra el repo vacío `RENT`, renombra `SULBASE_01_RENT` → `RENT`, luego `git remote set-url origin https://github.com/sulbase/RENT.git`.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
