@@ -1,0 +1,13 @@
+title = "RENT gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Examples and placeholders"
+paths = [
+  '''\.env\.example$''',
+  '''\.dev\.vars\.example$''',
+  '''\.env\.local\.example$''',
+  '''AGENTS\.md$''',
+]

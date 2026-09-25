@@ -192,13 +192,13 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] `organizations` + `memberships` con roles (onboarding + selector de org)
 - [x] Todas las consultas filtradas por organización (vía middleware; no confiar en org del cliente)
 - [x] Tests unitarios de roles y selección de tenant (`roles.test.ts`, `tenant.test.ts`)
-- [ ] Tests de integración API de aislamiento entre organizaciones
+- [x] Tests de integración API de aislamiento (`src/server/integration/org-isolation.test.ts`; ampliar a más rutas si hace falta)
 
 ### Fase 5 — CI y despliegue
-- [ ] CI: typecheck, lint, tests, build, escaneo de secretos
-- [ ] Despliegue del Worker a staging y luego a producción
-- [ ] Rate limiting en endpoints públicos y de autenticación
-- [ ] Restauración probada desde un `db dump` (el plan Free no incluye backups automáticos ni PITR)
+- [x] CI: typecheck, lint (`biome` en `src/server`), tests, build, escaneo de secretos (`gitleaks`)
+- [x] Staging = preview Worker en PR (`preview` job); producción = push a `main` (`deploy` job) — ver §5
+- [x] Rate limiting en `/api/*` y rutas auth-adjacentes (`/api/me`, `/api/auth/*`) — ver `src/server/auth/rate-limit.ts`
+- [ ] Restauración probada desde un `db dump` (procedimiento en `OpenProperty/docs/db-backup-restore.md`; ejecutar en lab)
 
 ### Fase 6 — SEO y GEO (si hay páginas públicas)
 - [ ] Decisión sobre SSR con Remix / React Router v7
@@ -215,9 +215,9 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 - [ ] Restauración probada desde un volcado manual (`db dump`)
 - [ ] Rate limiting y validación de entrada revisados
-- [ ] Prueba de carga básica sobre la API
-- [ ] Aislamiento entre organizaciones verificado
-- [ ] Plan de rollback documentado
+- [ ] Prueba de carga básica sobre la API (guía en `OpenProperty/docs/load-test.md`; ejecutar antes del lanzamiento)
+- [x] Aislamiento entre organizaciones verificado (tests de integración + revisión manual en lab)
+- [x] Plan de rollback documentado (`OpenProperty/docs/rollback.md`)
 
 ## 9. Control de riesgos
 

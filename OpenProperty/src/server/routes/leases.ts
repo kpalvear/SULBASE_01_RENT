@@ -15,27 +15,27 @@ import {
 import { parseJson } from "../validation";
 
 export function mountLeasesRoutes(app: Hono<AppEnv>) {
-const LeaseInput = z.object({
-  unit_id: z.string().uuid(),
-  primary_tenant_id: z.string().uuid().nullable().optional(),
-  start_date: z.string(),
-  end_date: z.string(),
-  monthly_rent: z.number().min(0).optional(),
-  deposit: z.number().min(0).optional(),
-  rent_due_day: z.number().int().min(1).max(31).optional(),
-  late_fee: z.number().min(0).optional(),
-  status: z.enum(["upcoming", "active", "ended", "cancelled"]).optional(),
-  notes: z.string().optional().nullable(),
-});
+  const LeaseInput = z.object({
+    unit_id: z.string().uuid(),
+    primary_tenant_id: z.string().uuid().nullable().optional(),
+    start_date: z.string(),
+    end_date: z.string(),
+    monthly_rent: z.number().min(0).optional(),
+    deposit: z.number().min(0).optional(),
+    rent_due_day: z.number().int().min(1).max(31).optional(),
+    late_fee: z.number().min(0).optional(),
+    status: z.enum(["upcoming", "active", "ended", "cancelled"]).optional(),
+    notes: z.string().optional().nullable(),
+  });
 
-const LEASE_FROM = `
+  const LEASE_FROM = `
   FROM leases l
   LEFT JOIN units u ON u.id = l.unit_id AND u.organization_id = l.organization_id
   LEFT JOIN properties p ON p.id = u.property_id AND p.organization_id = u.organization_id
   LEFT JOIN tenants t ON t.id = l.primary_tenant_id AND t.organization_id = l.organization_id`;
 
-function leaseSelect(where: string): string {
-  return `
+  function leaseSelect(where: string): string {
+    return `
   SELECT l.*,
     u.name as unit_name,
     p.id as property_id, p.name as property_name, p.color as property_color,
@@ -43,102 +43,106 @@ function leaseSelect(where: string): string {
     t.email as tenant_email, t.phone as tenant_phone
   ${LEASE_FROM}
   WHERE l.organization_id = $1 ${where}`;
-}
-
-app.get("/api/leases", async (c) => {
-  const o = orgId(c);
-  const status = c.req.query("status");
-  const tenantId = uuidParam(c.req.query("tenant_id"));
-  const unitId = uuidParam(c.req.query("unit_id"));
-  const filters: string[] = [];
-  const params: SqlParam[] = [o];
-  let n = 2;
-  if (status) {
-    filters.push(`l.status = $${n++}`);
-    params.push(status);
   }
-  if (tenantId) {
-    filters.push(`l.primary_tenant_id = $${n++}`);
-    params.push(tenantId);
-  }
-  if (unitId) {
-    filters.push(`l.unit_id = $${n++}`);
-    params.push(unitId);
-  }
-  const extra = filters.length ? `AND ${filters.join(" AND ")}` : "";
-  const rows = await query(c, `${leaseSelect(extra)} ORDER BY l.start_date DESC`, params);
-  return c.json({ leases: normalizeRows(rows) });
-});
 
-app.get("/api/leases/:id", async (c) => {
-  const id = uuidParam(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid ID" }, 400);
-  const o = orgId(c);
-  const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, id]);
-  if (!row) return c.json({ error: "Not found" }, 404);
-  return c.json({ lease: normalizeRow(row as Record<string, unknown>) });
-});
+  app.get("/api/leases", async (c) => {
+    const o = orgId(c);
+    const status = c.req.query("status");
+    const tenantId = uuidParam(c.req.query("tenant_id"));
+    const unitId = uuidParam(c.req.query("unit_id"));
+    const filters: string[] = [];
+    const params: SqlParam[] = [o];
+    let n = 2;
+    if (status) {
+      filters.push(`l.status = $${n++}`);
+      params.push(status);
+    }
+    if (tenantId) {
+      filters.push(`l.primary_tenant_id = $${n++}`);
+      params.push(tenantId);
+    }
+    if (unitId) {
+      filters.push(`l.unit_id = $${n++}`);
+      params.push(unitId);
+    }
+    const extra = filters.length ? `AND ${filters.join(" AND ")}` : "";
+    const rows = await query(c, `${leaseSelect(extra)} ORDER BY l.start_date DESC`, params);
+    return c.json({ leases: normalizeRows(rows) });
+  });
 
-app.post("/api/leases", async (c) => {
-  const parsed = await parseJson(c, LeaseInput);
-  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-  const d = parsed.data;
-  const o = orgId(c);
-  const inserted = await get<{ id: string }>(
-    c,
-    `INSERT INTO leases (organization_id, unit_id, primary_tenant_id, start_date, end_date, monthly_rent, deposit, rent_due_day, late_fee, status, notes)
+  app.get("/api/leases/:id", async (c) => {
+    const id = uuidParam(c.req.param("id"));
+    if (!id) return c.json({ error: "Invalid ID" }, 400);
+    const o = orgId(c);
+    const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, id]);
+    if (!row) return c.json({ error: "Not found" }, 404);
+    return c.json({ lease: normalizeRow(row as Record<string, unknown>) });
+  });
+
+  app.post("/api/leases", async (c) => {
+    const parsed = await parseJson(c, LeaseInput);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const d = parsed.data;
+    const o = orgId(c);
+    const inserted = await get<{ id: string }>(
+      c,
+      `INSERT INTO leases (organization_id, unit_id, primary_tenant_id, start_date, end_date, monthly_rent, deposit, rent_due_day, late_fee, status, notes)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-    [
-      o,
-      d.unit_id,
-      d.primary_tenant_id ?? null,
-      d.start_date,
-      d.end_date,
-      String(d.monthly_rent ?? 0),
-      String(d.deposit ?? 0),
-      d.rent_due_day ?? 1,
-      String(d.late_fee ?? 0),
-      d.status ?? "active",
-      d.notes ?? null,
-    ],
-  );
-  if ((d.status ?? "active") === "active") {
-    await run(c, "UPDATE units SET status = 'occupied' WHERE id = $1 AND organization_id = $2", [d.unit_id, o]);
-  }
-  if (!inserted?.id) return c.json({ error: "Insert failed" }, 500);
-  const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, inserted.id]);
-  return c.json({ lease: normalizeRow(row as Record<string, unknown>) }, 201);
-});
+      [
+        o,
+        d.unit_id,
+        d.primary_tenant_id ?? null,
+        d.start_date,
+        d.end_date,
+        String(d.monthly_rent ?? 0),
+        String(d.deposit ?? 0),
+        d.rent_due_day ?? 1,
+        String(d.late_fee ?? 0),
+        d.status ?? "active",
+        d.notes ?? null,
+      ],
+    );
+    if ((d.status ?? "active") === "active") {
+      await run(c, "UPDATE units SET status = 'occupied' WHERE id = $1 AND organization_id = $2", [
+        d.unit_id,
+        o,
+      ]);
+    }
+    if (!inserted?.id) return c.json({ error: "Insert failed" }, 500);
+    const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, inserted.id]);
+    return c.json({ lease: normalizeRow(row as Record<string, unknown>) }, 201);
+  });
 
-app.put("/api/leases/:id", async (c) => {
-  const id = uuidParam(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid ID" }, 400);
-  const parsed = await parseJson(c, LeaseInput.partial());
-  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-  const data = { ...parsed.data };
-  if (data.monthly_rent !== undefined) data.monthly_rent = String(data.monthly_rent) as unknown as number;
-  if (data.deposit !== undefined) data.deposit = String(data.deposit) as unknown as number;
-  if (data.late_fee !== undefined) data.late_fee = String(data.late_fee) as unknown as number;
-  const { sets, params, next } = buildUpdate(data as Record<string, unknown>);
-  if (!sets.length) return c.json({ error: "No fields" }, 400);
-  const o = orgId(c);
-  params.push(id, o);
-  const r = await run(
-    c,
-    `UPDATE leases SET ${sets.join(", ")} WHERE id = $${next} AND organization_id = $${next + 1}`,
-    params,
-  );
-  if (!r.changes) return c.json({ error: "Not found" }, 404);
-  const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, id]);
-  return c.json({ lease: normalizeRow(row as Record<string, unknown>) });
-});
+  app.put("/api/leases/:id", async (c) => {
+    const id = uuidParam(c.req.param("id"));
+    if (!id) return c.json({ error: "Invalid ID" }, 400);
+    const parsed = await parseJson(c, LeaseInput.partial());
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const data = { ...parsed.data };
+    if (data.monthly_rent !== undefined)
+      data.monthly_rent = String(data.monthly_rent) as unknown as number;
+    if (data.deposit !== undefined) data.deposit = String(data.deposit) as unknown as number;
+    if (data.late_fee !== undefined) data.late_fee = String(data.late_fee) as unknown as number;
+    const { sets, params, next } = buildUpdate(data as Record<string, unknown>);
+    if (!sets.length) return c.json({ error: "No fields" }, 400);
+    const o = orgId(c);
+    params.push(id, o);
+    const r = await run(
+      c,
+      `UPDATE leases SET ${sets.join(", ")} WHERE id = $${next} AND organization_id = $${next + 1}`,
+      params,
+    );
+    if (!r.changes) return c.json({ error: "Not found" }, 404);
+    const row = await get(c, `${leaseSelect("AND l.id = $2")}`, [o, id]);
+    return c.json({ lease: normalizeRow(row as Record<string, unknown>) });
+  });
 
-app.delete("/api/leases/:id", async (c) => {
-  const id = uuidParam(c.req.param("id"));
-  if (!id) return c.json({ error: "Invalid ID" }, 400);
-  const o = orgId(c);
-  const r = await run(c, "DELETE FROM leases WHERE id = $1 AND organization_id = $2", [id, o]);
-  if (!r.changes) return c.json({ error: "Not found" }, 404);
-  return c.json({ ok: true });
-});
+  app.delete("/api/leases/:id", async (c) => {
+    const id = uuidParam(c.req.param("id"));
+    if (!id) return c.json({ error: "Invalid ID" }, 400);
+    const o = orgId(c);
+    const r = await run(c, "DELETE FROM leases WHERE id = $1 AND organization_id = $2", [id, o]);
+    if (!r.changes) return c.json({ error: "Not found" }, 404);
+    return c.json({ ok: true });
+  });
 }

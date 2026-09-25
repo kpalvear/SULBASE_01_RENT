@@ -2,8 +2,7 @@ import type { Context } from "hono";
 import type { Sql } from "./db";
 import type { AppEnv } from "./env";
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function orgId(c: Context<AppEnv>): string {
   return c.get("orgId");
@@ -96,7 +95,14 @@ export function normalizeRow<T extends Record<string, unknown>>(row: T): T {
         /* keep ISO */
       }
     }
-    if (k.endsWith("_date") || k === "start_date" || k === "end_date" || k === "due_date" || k === "date_of_birth" || k === "desired_move_in") {
+    if (
+      k.endsWith("_date") ||
+      k === "start_date" ||
+      k === "end_date" ||
+      k === "due_date" ||
+      k === "date_of_birth" ||
+      k === "desired_move_in"
+    ) {
       if (v instanceof Date) {
         (out as Record<string, unknown>)[k] = v.toISOString().slice(0, 10);
       }

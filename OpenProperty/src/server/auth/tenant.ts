@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { memberships, organizations } from "../../db/schema";
 import type { AppDb } from "../db";
 import type { MembershipRole } from "./roles";
@@ -10,10 +10,7 @@ export type MembershipRow = {
   role: MembershipRole;
 };
 
-export async function listMemberships(
-  db: AppDb,
-  userId: string,
-): Promise<MembershipRow[]> {
+export async function listMemberships(db: AppDb, userId: string): Promise<MembershipRow[]> {
   const rows = await db
     .select({
       organizationId: memberships.organizationId,

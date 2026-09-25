@@ -13,6 +13,12 @@ run_worker_first = ["/api/*"]
 [vars]
 DEV_ORGANIZATION_SLUG = "dev"
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+
 # Opcional en producción: crea Hyperdrive apuntando al pooler de Supabase y descomenta.
 # [[hyperdrive]]
 # binding = "HYPERDRIVE"
