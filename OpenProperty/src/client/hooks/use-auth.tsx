@@ -68,40 +68,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const storedOrg = getStoredOrganizationId();
-    const me = await api<{
-      mode: string;
-      memberships: MembershipInfo[];
-      organization_id: string | null;
-      role: string | null;
-    }>("GET", "/api/me", undefined, {
-      accessToken: current.access_token,
-      organizationId: storedOrg,
-    });
+    try {
+      const me = await api<{
+        mode: string;
+        memberships: MembershipInfo[];
+        organization_id: string | null;
+        role: string | null;
+      }>("GET", "/api/me", undefined, {
+        accessToken: current.access_token,
+        organizationId: storedOrg,
+      });
 
-    if (me.mode === "dev_bypass") {
-      setDevBypass(true);
-      setOrganizationId(me.organization_id);
+      if (me.mode === "dev_bypass") {
+        setDevBypass(true);
+        setOrganizationId(me.organization_id);
+        setRole(me.role);
+        setMemberships([]);
+        return;
+      }
+
+      setDevBypass(false);
+      setMemberships(me.memberships);
+
+      let active = me.organization_id;
+      if (!active && me.memberships.length === 1) {
+        active = me.memberships[0].organization_id;
+        setStoredOrganizationId(active);
+      }
+      if (!active && storedOrg && me.memberships.some((m) => m.organization_id === storedOrg)) {
+        active = storedOrg;
+      }
+
+      setOrganizationId(active);
       setRole(me.role);
+    } catch {
       setMemberships([]);
+      setOrganizationId(null);
+      setRole(null);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setDevBypass(false);
-    setMemberships(me.memberships);
-
-    let active = me.organization_id;
-    if (!active && me.memberships.length === 1) {
-      active = me.memberships[0].organization_id;
-      setStoredOrganizationId(active);
-    }
-    if (!active && storedOrg && me.memberships.some((m) => m.organization_id === storedOrg)) {
-      active = storedOrg;
-    }
-
-    setOrganizationId(active);
-    setRole(me.role);
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -111,8 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const supabase = getSupabase()!;
     void (async () => {
-      // Pick up session from email confirmation / magic-link callback in the URL.
-      await supabase.auth.getSession();
+      // Email confirmation puts tokens in the URL hash; wait for Supabase to persist session.
+      const { data } = await supabase.auth.getSession();
+      if (!data.session && window.location.hash.includes("access_token")) {
+        await new Promise((r) => setTimeout(r, 300));
+      }
       await refreshProfile();
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -174,17 +183,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const bootstrapOrganization = useCallback(
     async (name: string) => {
-      if (!session) throw new Error("Sign in required");
+      const supabase = getSupabase();
+      if (!supabase) throw new Error("Auth not configured");
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken) throw new Error("Sign in required");
       const res = await api<{ organization: { id: string } }>(
         "POST",
         "/api/auth/bootstrap",
         { name },
-        { accessToken: session.access_token },
+        { accessToken },
       );
       setStoredOrganizationId(res.organization.id);
       await refreshProfile();
     },
-    [session, refreshProfile],
+    [refreshProfile],
   );
 
   const value = useMemo<AuthState>(

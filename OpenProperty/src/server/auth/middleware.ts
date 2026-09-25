@@ -56,7 +56,7 @@ export const authMiddleware = factory.createMiddleware(async (c, next) => {
 
   let user: { sub: string; email?: string };
   try {
-    user = await verifySupabaseAccessToken(token, c.env.SUPABASE_JWT_SECRET!);
+    user = await verifySupabaseAccessToken(token, c.env.SUPABASE_JWT_SECRET);
   } catch {
     return c.json({ error: "Invalid or expired session" }, 401);
   }
