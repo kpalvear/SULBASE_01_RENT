@@ -1,0 +1,9 @@
+{
+  "name": "@sulbase/rent-repo",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --dir OpenProperty install --frozen-lockfile && pnpm --dir OpenProperty build",
+    "deploy": "pnpm --dir OpenProperty exec wrangler deploy",
+    "typecheck": "pnpm --dir OpenProperty typecheck"
+  }
+}

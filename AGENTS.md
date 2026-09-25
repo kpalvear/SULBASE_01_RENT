@@ -91,7 +91,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 ## 5. Flujo de trabajo
 
 - **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
-- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). Conectar **Workers Builds** al repo con directorio raíz de build `OpenProperty`, comando `pnpm install && pnpm build`, deploy `pnpm exec wrangler deploy`. Preview por PR: `pnpm exec wrangler preview` (requiere `wrangler login` y token/API en CI). Secretos solo con `wrangler secret put`, nunca en git.
+- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Workers Builds** (GitHub → sulbase/RENT): una de dos configuraciones válidas — (A) raíz del repo `/`, build `pnpm run build`, deploy `pnpm run deploy`; (B) raíz `OpenProperty`, build `pnpm install --frozen-lockfile && pnpm build`, deploy `pnpm exec wrangler deploy`. Si el build falla con `packages field missing`, la raíz no es `OpenProperty` o falta `packages` en `pnpm-workspace.yaml`. Preview en PR: GitHub Actions + `wrangler preview` (secrets `CLOUDFLARE_*`). Secretos de app: `wrangler secret put`, nunca en git.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
