@@ -168,7 +168,10 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Proyecto Supabase Free de desarrollo creado; pooler (5432 y 6543) verificado. Sin PITR ni backups de pago
 - [x] Worker `rent` en edge; deploy de `main` vía GitHub Actions (`deploy`); Workers Builds desconectado en RENT; ver §5
 - [ ] Alertas de costo/errores en Cloudflare dashboard (aplazado; GitHub + Slack GitHub app bastan por ahora)
-- [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
+- [x] Secretos cargados con `wrangler secret put` / GitHub Actions; nada en el repositorio
+  - Worker `rent` (Wrangler): `DATABASE_URL` (pooler 6543), `SUPABASE_JWT_SECRET`
+  - GitHub Actions: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (build frontend en CI)
+  - Comprobado en prod/lab: `/api/health` → Postgres, login Supabase, deploy Actions (sin valores en git; Gitleaks en CI)
 
 ### Fase 1 — Esquema
 - [x] `src/db/schema.ts` en Drizzle a partir de `schema.sql` (con `organization_id`, sin RLS aún)
