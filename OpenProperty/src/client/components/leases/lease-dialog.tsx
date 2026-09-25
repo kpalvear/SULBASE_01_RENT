@@ -15,7 +15,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lease?: Lease;
-  defaults?: { unit_id?: number; primary_tenant_id?: number };
+  defaults?: { unit_id?: string; primary_tenant_id?: string };
   onSaved?: () => void;
 }
 
@@ -32,8 +32,8 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
   const [confirming, setConfirming] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
-  const [unitId, setUnitId] = useState<number | "">("");
-  const [tenantId, setTenantId] = useState<number | "">("");
+  const [unitId, setUnitId] = useState<string | "">("");
+  const [tenantId, setTenantId] = useState<string | "">("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [rent, setRent] = useState("0");
@@ -88,8 +88,8 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
     setSaving(true);
     try {
       const payload = {
-        unit_id: Number(unitId),
-        primary_tenant_id: tenantId ? Number(tenantId) : null,
+        unit_id: unitId,
+        primary_tenant_id: tenantId || null,
         start_date: start,
         end_date: end,
         monthly_rent: parseFloat(rent) || 0,
@@ -128,13 +128,13 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
   // Get a property association from the API (LEASE_SELECT joins) — but for the dialog
   // we just need property + unit name in the dropdown. Build a "Property · Unit" label.
   // Fetch once when open.
-  const [unitLabels, setUnitLabels] = useState<Map<number, string>>(new Map());
+  const [unitLabels, setUnitLabels] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
         const data = await api<{ units: Unit[] }>("GET", "/api/units");
-        const map = new Map<number, string>();
+        const map = new Map<string, string>();
         for (const u of data.units) {
           map.set(u.id, `${u.property_name ?? "—"} · ${u.name}`);
         }
@@ -156,7 +156,7 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Unit</Label>
-              <Select value={String(unitId || "")} onValueChange={(v) => setUnitId(v ? Number(v) : "")}>
+              <Select value={String(unitId || "")} onValueChange={(v) => setUnitId(v || "")}>
                 <SelectTrigger><SelectValue placeholder="Pick a unit" /></SelectTrigger>
                 <SelectContent>
                   {units.map((u) => (
@@ -169,7 +169,7 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
             </div>
             <div>
               <Label>Primary tenant</Label>
-              <Select value={String(tenantId || "")} onValueChange={(v) => setTenantId(v ? Number(v) : "")}>
+              <Select value={String(tenantId || "")} onValueChange={(v) => setTenantId(v || "")}>
                 <SelectTrigger><SelectValue placeholder="Pick a tenant" /></SelectTrigger>
                 <SelectContent>
                   {tenants.map((t) => (

@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 
+const UUID_SEGMENT =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+
 export type Route =
   | { name: "dashboard" }
   | { name: "properties" }
-  | { name: "property"; id: number }
+  | { name: "property"; id: string }
   | { name: "tenants" }
-  | { name: "tenant"; id: number }
+  | { name: "tenant"; id: string }
   | { name: "leases" }
   | { name: "rent" }
   | { name: "maintenance" }
@@ -15,11 +18,11 @@ export type Route =
 function parse(path: string): Route {
   if (path === "/" || path === "/dashboard") return { name: "dashboard" };
   if (path === "/properties") return { name: "properties" };
-  let m = path.match(/^\/properties\/(\d+)$/);
-  if (m) return { name: "property", id: parseInt(m[1], 10) };
+  let m = path.match(new RegExp(`^/properties/(${UUID_SEGMENT})$`, "i"));
+  if (m) return { name: "property", id: m[1] };
   if (path === "/tenants") return { name: "tenants" };
-  m = path.match(/^\/tenants\/(\d+)$/);
-  if (m) return { name: "tenant", id: parseInt(m[1], 10) };
+  m = path.match(new RegExp(`^/tenants/(${UUID_SEGMENT})$`, "i"));
+  if (m) return { name: "tenant", id: m[1] };
   if (path === "/leases") return { name: "leases" };
   if (path === "/rent") return { name: "rent" };
   if (path === "/maintenance") return { name: "maintenance" };

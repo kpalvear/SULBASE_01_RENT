@@ -67,7 +67,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 - **Validación con Zod en cada endpoint.**
 - **Rate limiting** en endpoints públicos y de autenticación (mecanismo de Cloudflare o middleware; verificar opciones vigentes).
 - **Secretos** solo en el gestor de entorno (`wrangler secret put`), nunca en el repositorio.
-- **Costos:** alertas de uso y gasto en Cloudflare el día 1. En Supabase no hay plan de pago: vigilar las cuotas del Free.
+- **Costos:** Supabase en Free; vigilar cuotas en el dashboard. Alertas formales en Cloudflare aplazadas; avisos operativos vía GitHub (email) y Slack (`/github subscribe`) por ahora.
 
 ### 4.3 Persistencia
 - Supabase Postgres + Drizzle. Esquema en `src/db/schema.ts`.
@@ -79,7 +79,7 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 ### 4.4 Multi-organización y permisos
 - Añadir `organization_id` (not null) a las tablas principales y una tabla `memberships` con rol.
 - Autenticación: Supabase Auth.
-- **Decisión abierta:** permisos en la aplicación (recomendado como base) vs. RLS en Postgres (como red de seguridad o principal). Decidir antes de escribir endpoints protegidos.
+- **Permisos en la aplicación (cerrado):** JWT Supabase en el Worker, `memberships` + rol, `organization_id` en cada query; RLS aplazado como red de seguridad opcional (el pooler del Worker no sustituye esto por sí solo).
 - Roles iniciales sugeridos: `owner`, `manager`, `staff`, `viewer`.
 
 ### 4.5 Visibilidad para agentes de IA (GEO)
@@ -92,6 +92,8 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 
 - **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
 - **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Producción (edge):** solo **GitHub Actions** — cada push a `main` → jobs `verify` luego `deploy` en `.github/workflows/ci.yml` (`npm run build` + `npm run deploy` desde la raíz del repo; secrets `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`). URL: `https://rent.sistemas-d5d.workers.dev`. **Preview antes de merge:** job `preview` en pull requests (`wrangler preview`). **No usar Workers Builds** en este repo (desconectar Git en el dashboard del Worker `rent` → Settings → Build) para evitar doble deploy y un segundo token; otros proyectos de la cuenta pueden seguir con Builds. D1 solo en `wrangler dev -e local` hasta Fase 2. Secretos de app: `wrangler secret put`, nunca en git.
+- **Postgres en producción:** el deploy de GitHub **no** configura la base de datos. Tras el primer deploy (o al cambiar de proyecto Supabase), ejecutar `wrangler secret put DATABASE_URL` con la URL del **transaction pooler** de Supabase (puerto **6543**, `?pgbouncer=true`). Sin ese secreto, el Worker arranca pero `/api/*` falla al conectar. En local, copiar `OpenProperty/.dev.vars.example` → `.dev.vars` con la misma URL. Las migraciones Drizzle se aplican **fuera** del Worker (local o CI dedicado), no en el job `deploy`.
+- **Auth en producción:** `wrangler secret put SUPABASE_JWT_SECRET` (JWT Secret del proyecto). Sin secret ni bypass, `/api/*` responde 401. Local sin login: `AUTH_DEV_BYPASS=true` en `.dev.vars` **solo** si no hay `SUPABASE_JWT_SECRET`. Frontend: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `.env` para Vite.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
@@ -164,31 +166,31 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Repositorio público con `main` protegida y este `AGENTS.md` en la raíz
 - [x] Proyecto Supabase Free de desarrollo creado; pooler (5432 y 6543) verificado. Sin PITR ni backups de pago
 - [x] Worker `rent` en edge; deploy de `main` vía GitHub Actions (`deploy`); Workers Builds desconectado en RENT; ver §5
-- [ ] Alertas de costo y de errores configuradas
+- [ ] Alertas de costo/errores en Cloudflare dashboard (aplazado; GitHub + Slack GitHub app bastan por ahora)
 - [ ] Secretos cargados con `wrangler secret put`; nada en el repositorio
 
 ### Fase 1 — Esquema
-- [ ] `src/db/schema.ts` en Drizzle a partir de `schema.sql` (con `organization_id`, sin RLS aún)
-- [ ] `drizzle.config.ts` y primera migración versionada
-- [ ] Migración aplicada al Supabase de desarrollo
+- [x] `src/db/schema.ts` en Drizzle a partir de `schema.sql` (con `organization_id`, sin RLS aún)
+- [x] `drizzle.config.ts` y primera migración versionada
+- [x] Migración aplicada al Supabase de desarrollo
 
 ### Fase 2 — Capa de datos
-- [ ] Reemplazar `@clawnify/db` por Drizzle (Hyperdrive / pooler)
-- [ ] `wrangler.toml` sin binding a D1; añadir Hyperdrive si aplica
-- [ ] `wrangler dev` funcionando contra Supabase
+- [x] Reemplazar `@clawnify/db` por Drizzle (Hyperdrive / pooler)
+- [x] `wrangler.toml` sin binding a D1; añadir Hyperdrive si aplica
+- [x] `wrangler dev` funcionando contra Supabase
 
 ### Fase 3 — API
-- [ ] Partir `index.ts` en módulos de rutas por dominio
-- [ ] Validación Zod en cada endpoint
-- [ ] Hono RPC: tipos compartidos backend ↔ frontend
-- [ ] Panel (`/api/dashboard/summary`) y generación de cargos de renta revisados
+- [x] Partir `index.ts` en módulos de rutas por dominio
+- [x] Validación Zod en cada endpoint
+- [x] Hono RPC: tipos compartidos backend ↔ frontend
+- [x] Panel (`/api/dashboard/summary`) y generación de cargos de renta revisados
 
 ### Fase 4 — Autenticación y organizaciones
-- [ ] Decisión: permisos en la aplicación vs. RLS
-- [ ] Supabase Auth integrado
-- [ ] `organizations` + `memberships` con roles
-- [ ] Todas las consultas filtradas por organización
-- [ ] Tests de aislamiento entre organizaciones
+- [x] Decisión: permisos en la aplicación vs. RLS (RLS aplazado)
+- [x] Supabase Auth integrado (cliente + JWT en Worker)
+- [x] `organizations` + `memberships` con roles (onboarding + selector de org)
+- [x] Todas las consultas filtradas por organización (vía middleware; no confiar en org del cliente)
+- [ ] Tests de aislamiento entre organizaciones (integración API; unitarios de roles en `pnpm test`)
 
 ### Fase 5 — CI y despliegue
 - [ ] CI: typecheck, lint, tests, build, escaneo de secretos
@@ -232,7 +234,7 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 
 | # | Decisión | Estado |
 |---|---|---|
-| 1 | Permisos en la aplicación vs. RLS | Pendiente |
+| 1 | Permisos en la aplicación vs. RLS | Cerrado: aplicación primero; RLS opcional después |
 | 2 | Multi-organización desde el esquema inicial | Recomendado: sí |
 | 3 | SSR (Remix / RR7) para páginas públicas | Pendiente |
 | 4 | Skill comunitaria de Drizzle | Opcional, revisar antes |

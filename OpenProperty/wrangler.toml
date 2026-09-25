@@ -3,16 +3,17 @@ main = "src/server/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# SPA (Vite) + API Hono en /api/* — Fase 2 sustituye D1 por Supabase/Hyperdrive
+# SPA (Vite) + API Hono en /api/* — Postgres vía Supabase pooler o Hyperdrive
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
 
-# D1 solo en local (`wrangler dev -e local`). Workers Builds / deploy remoto no admite database_id = "local".
-[env.local]
-[[env.local.d1_databases]]
-binding = "DB"
-database_name = "open-property-db"
-database_id = "local"
+[vars]
+DEV_ORGANIZATION_SLUG = "dev"
+
+# Opcional en producción: crea Hyperdrive apuntando al pooler de Supabase y descomenta.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<hyperdrive-config-id>"

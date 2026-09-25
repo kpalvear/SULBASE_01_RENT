@@ -27,7 +27,7 @@ const STATUS_TONE: Record<string, string> = {
   unavailable: "bg-muted text-muted-foreground",
 };
 
-export function PropertyPage({ id, navigate }: { id: number; navigate: (to: string) => void }) {
+export function PropertyPage({ id, navigate }: { id: string; navigate: (to: string) => void }) {
   const app = useApp();
   const [property, setProperty] = useState<Property | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);

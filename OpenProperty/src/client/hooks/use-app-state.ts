@@ -94,20 +94,20 @@ export function useAppState() {
     return res.property;
   }, [refreshLookups]);
 
-  const updateProperty = useCallback(async (id: number, patch: Partial<NewProperty>) => {
+  const updateProperty = useCallback(async (id: string, patch: Partial<NewProperty>) => {
     const res = await api<{ property: Property }>("PUT", `/api/properties/${id}`, patch);
     await refreshLookups();
     return res.property;
   }, [refreshLookups]);
 
-  const deleteProperty = useCallback(async (id: number) => {
+  const deleteProperty = useCallback(async (id: string) => {
     await api("DELETE", `/api/properties/${id}`);
     await refreshLookups();
   }, [refreshLookups]);
 
   // Unit mutations ─────────────────────────────────────────────────
 
-  const listUnits = useCallback(async (propertyId?: number): Promise<Unit[]> => {
+  const listUnits = useCallback(async (propertyId?: string): Promise<Unit[]> => {
     const path = propertyId ? `/api/units?property_id=${propertyId}` : "/api/units";
     const data = await api<{ units: Unit[] }>("GET", path);
     return data.units;
@@ -119,13 +119,13 @@ export function useAppState() {
     return res.unit;
   }, [refreshLookups]);
 
-  const updateUnit = useCallback(async (id: number, patch: Partial<NewUnit>) => {
+  const updateUnit = useCallback(async (id: string, patch: Partial<NewUnit>) => {
     const res = await api<{ unit: Unit }>("PUT", `/api/units/${id}`, patch);
     await refreshLookups();
     return res.unit;
   }, [refreshLookups]);
 
-  const deleteUnit = useCallback(async (id: number) => {
+  const deleteUnit = useCallback(async (id: string) => {
     await api("DELETE", `/api/units/${id}`);
     await refreshLookups();
   }, [refreshLookups]);
@@ -143,18 +143,18 @@ export function useAppState() {
     return res.tenant;
   }, []);
 
-  const updateTenant = useCallback(async (id: number, patch: Partial<NewTenant>) => {
+  const updateTenant = useCallback(async (id: string, patch: Partial<NewTenant>) => {
     const res = await api<{ tenant: Tenant }>("PUT", `/api/tenants/${id}`, patch);
     return res.tenant;
   }, []);
 
-  const deleteTenant = useCallback(async (id: number) => {
+  const deleteTenant = useCallback(async (id: string) => {
     await api("DELETE", `/api/tenants/${id}`);
   }, []);
 
   // Lease mutations ────────────────────────────────────────────────
 
-  const listLeases = useCallback(async (params?: { tenant_id?: number; unit_id?: number; status?: string }): Promise<Lease[]> => {
+  const listLeases = useCallback(async (params?: { tenant_id?: string; unit_id?: string; status?: string }): Promise<Lease[]> => {
     const qs = new URLSearchParams();
     if (params?.tenant_id) qs.set("tenant_id", String(params.tenant_id));
     if (params?.unit_id) qs.set("unit_id", String(params.unit_id));
@@ -170,13 +170,13 @@ export function useAppState() {
     return res.lease;
   }, [refreshLookups]);
 
-  const updateLease = useCallback(async (id: number, patch: Partial<NewLease>) => {
+  const updateLease = useCallback(async (id: string, patch: Partial<NewLease>) => {
     const res = await api<{ lease: Lease }>("PUT", `/api/leases/${id}`, patch);
     await refreshLookups();
     return res.lease;
   }, [refreshLookups]);
 
-  const deleteLease = useCallback(async (id: number) => {
+  const deleteLease = useCallback(async (id: string) => {
     await api("DELETE", `/api/leases/${id}`);
     await refreshLookups();
   }, [refreshLookups]);
@@ -195,7 +195,7 @@ export function useAppState() {
   }, []);
 
   const recordPayment = useCallback(async (input: {
-    charge_id: number;
+    charge_id: string;
     amount: number;
     method?: string;
     reference?: string | null;
@@ -214,20 +214,20 @@ export function useAppState() {
     return res.vendor;
   }, [refreshLookups]);
 
-  const updateVendor = useCallback(async (id: number, patch: Partial<NewVendor>) => {
+  const updateVendor = useCallback(async (id: string, patch: Partial<NewVendor>) => {
     const res = await api<{ vendor: Vendor }>("PUT", `/api/vendors/${id}`, patch);
     await refreshLookups();
     return res.vendor;
   }, [refreshLookups]);
 
-  const deleteVendor = useCallback(async (id: number) => {
+  const deleteVendor = useCallback(async (id: string) => {
     await api("DELETE", `/api/vendors/${id}`);
     await refreshLookups();
   }, [refreshLookups]);
 
   // Work order mutations ───────────────────────────────────────────
 
-  const listWorkOrders = useCallback(async (params?: { status?: string; property_id?: number }): Promise<WorkOrder[]> => {
+  const listWorkOrders = useCallback(async (params?: { status?: string; property_id?: string }): Promise<WorkOrder[]> => {
     const qs = new URLSearchParams();
     if (params?.status) qs.set("status", params.status);
     if (params?.property_id) qs.set("property_id", String(params.property_id));
@@ -241,12 +241,12 @@ export function useAppState() {
     return res.work_order;
   }, []);
 
-  const updateWorkOrder = useCallback(async (id: number, patch: Partial<NewWorkOrder>) => {
+  const updateWorkOrder = useCallback(async (id: string, patch: Partial<NewWorkOrder>) => {
     const res = await api<{ work_order: WorkOrder }>("PUT", `/api/work-orders/${id}`, patch);
     return res.work_order;
   }, []);
 
-  const deleteWorkOrder = useCallback(async (id: number) => {
+  const deleteWorkOrder = useCallback(async (id: string) => {
     await api("DELETE", `/api/work-orders/${id}`);
   }, []);
 
