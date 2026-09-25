@@ -10,7 +10,9 @@ not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = ["/api/*"]
 
-[[d1_databases]]
+# D1 solo en local (`wrangler dev -e local`). Workers Builds / deploy remoto no admite database_id = "local".
+[env.local]
+[[env.local.d1_databases]]
 binding = "DB"
 database_name = "open-property-db"
 database_id = "local"
