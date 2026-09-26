@@ -1,4 +1,4 @@
-import type { Hyperdrive } from "@cloudflare/workers-types";
+import type { Hyperdrive, R2Bucket } from "@cloudflare/workers-types";
 import type { AppDb, Sql } from "./db";
 import type { MembershipRole } from "./auth/roles";
 
@@ -13,6 +13,14 @@ export type WorkerBindings = {
   /** Set to "true" only in local wrangler.toml; omit in production. */
   AUTH_DEV_BYPASS?: string;
   HYPERDRIVE?: Hyperdrive;
+  /** API key de firma.dev. Cabecera `Authorization` sin prefijo obligatorio. */
+  FIRMA_API_KEY?: string;
+  /** Secreto HMAC de los webhooks de firma.dev. */
+  FIRMA_WEBHOOK_SECRET?: string;
+  /** "true" sends the lab workers.dev host to https://rent.sulbase.com. */
+  CANONICAL_REDIRECT?: string;
+  /** Private R2 bucket. Downloads always go through the Worker. */
+  FILES?: R2Bucket;
 };
 
 export type WorkerVariables = {

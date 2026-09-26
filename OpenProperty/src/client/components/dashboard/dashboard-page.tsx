@@ -15,6 +15,8 @@ import type { DashboardSummary } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageShell } from "@/components/page-shell";
+import { priorityLabel, workStatusLabel } from "@/lib/labels";
+import { getFormatPrefs } from "@/lib/format-prefs";
 
 export function DashboardPage({ navigate }: { navigate: (to: string) => void }) {
   const { settings, setError } = useApp();
@@ -40,40 +42,40 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
   if (loading || !summary) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground">
-        Loading dashboard…
+        Cargando el panel…
       </div>
     );
   }
 
   return (
     <PageShell
-      title="Dashboard"
-      meta={`Snapshot of ${new Date().toLocaleDateString(undefined, { month: "long", year: "numeric" })}`}
+      title="Panel"
+      meta={`Resumen de ${new Date().toLocaleDateString(getFormatPrefs().language === "en" ? "en-US" : "es-MX", { month: "long", year: "numeric" })}`}
     >
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <KpiCard
-            label="Occupancy"
+            label="Ocupación"
             value={`${summary.occupancy_rate}%`}
-            sub={`${summary.occupied} of ${summary.units} units`}
+            sub={`${summary.occupied} de ${summary.units} unidades`}
             icon={<Home className="h-4 w-4" />}
           />
           <KpiCard
-            label="Active leases"
+            label="Contratos activos"
             value={String(summary.active_leases)}
-            sub={summary.upcoming_move_outs ? `${summary.upcoming_move_outs} ending in 30 days` : "No upcoming move-outs"}
+            sub={summary.upcoming_move_outs ? `${summary.upcoming_move_outs} terminan en 30 días` : "Ninguno por terminar"}
             icon={<ClipboardList className="h-4 w-4" />}
           />
           <KpiCard
-            label="Outstanding rent"
+            label="Renta pendiente"
             value={formatMoney(summary.month_outstanding, settings.currency)}
-            sub={`${formatMoney(summary.month_collected, settings.currency)} collected this month`}
+            sub={`${formatMoney(summary.month_collected, settings.currency)} cobrados este mes`}
             icon={<Receipt className="h-4 w-4" />}
           />
           <KpiCard
-            label="Open work orders"
+            label="Órdenes abiertas"
             value={String(summary.open_work_orders)}
-            sub={summary.urgent_work_orders ? `${summary.urgent_work_orders} urgent` : "Nothing urgent"}
+            sub={summary.urgent_work_orders ? `${summary.urgent_work_orders} urgentes` : "Nada urgente"}
             icon={<Wrench className="h-4 w-4" />}
             tone={summary.urgent_work_orders > 0 ? "warn" : "default"}
           />
@@ -82,49 +84,49 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Portfolio</h2>
+              <h2 className="text-sm font-semibold">Portafolio</h2>
               <button
                 type="button"
                 onClick={() => navigate("/properties")}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                View all
+                Ver todas
               </button>
             </div>
             <dl className="space-y-3 text-sm">
-              <Row label="Properties" value={summary.properties} icon={<Building2 className="h-4 w-4" />} />
-              <Row label="Total units" value={summary.units} />
-              <Row label="Occupied" value={summary.occupied} tone="positive" />
-              <Row label="Vacant" value={summary.vacant} tone={summary.vacant > 0 ? "warn" : "default"} />
+              <Row label="Propiedades" value={summary.properties} icon={<Building2 className="h-4 w-4" />} />
+              <Row label="Unidades" value={summary.units} />
+              <Row label="Ocupadas" value={summary.occupied} tone="positive" />
+              <Row label="Vacantes" value={summary.vacant} tone={summary.vacant > 0 ? "warn" : "default"} />
             </dl>
           </Card>
 
           <Card className="p-5 lg:col-span-2">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">This month's rent</h2>
+              <h2 className="text-sm font-semibold">Renta de este mes</h2>
               <button
                 type="button"
                 onClick={() => navigate("/rent")}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                Open ledger
+                Ver rentas
               </button>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <Stat
-                label="Collected"
+                label="Cobrado"
                 value={formatMoney(summary.month_collected, settings.currency)}
                 tone="positive"
               />
               <Stat
-                label="Outstanding"
+                label="Pendiente"
                 value={formatMoney(summary.month_outstanding, settings.currency)}
                 tone={summary.month_outstanding > 0 ? "warn" : "default"}
               />
               <Stat
-                label="Overdue"
+                label="Vencido"
                 value={formatMoney(summary.overdue_total, settings.currency)}
-                sub={summary.overdue_count ? `${summary.overdue_count} charge${summary.overdue_count === 1 ? "" : "s"}` : undefined}
+                sub={summary.overdue_count ? `${summary.overdue_count} ${summary.overdue_count === 1 ? "cargo" : "cargos"}` : undefined}
                 tone={summary.overdue_total > 0 ? "danger" : "default"}
               />
             </div>
@@ -134,17 +136,17 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Open work orders</h2>
+              <h2 className="text-sm font-semibold">Órdenes abiertas</h2>
               <button
                 type="button"
                 onClick={() => navigate("/maintenance")}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                View all
+                Ver todas
               </button>
             </div>
             {summary.recent_work_orders.length === 0 ? (
-              <Empty icon={<CheckCircle2 className="h-5 w-5" />} title="All caught up" message="No open work orders right now." />
+              <Empty icon={<CheckCircle2 className="h-5 w-5" />} title="Al día" message="No hay órdenes abiertas." />
             ) : (
               <ul className="divide-y">
                 {summary.recent_work_orders.map((w) => (
@@ -152,7 +154,7 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{w.title}</p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {[w.property_name, w.unit_name].filter(Boolean).join(" · ") || "Unassigned"}
+                        {[w.property_name, w.unit_name].filter(Boolean).join(" · ") || "Sin asignar"}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
@@ -167,17 +169,17 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
 
           <Card className="p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Lease expirations</h2>
+              <h2 className="text-sm font-semibold">Contratos por vencer</h2>
               <button
                 type="button"
                 onClick={() => navigate("/leases")}
                 className="text-xs font-medium text-primary hover:underline"
               >
-                View all
+                Ver todas
               </button>
             </div>
             {summary.upcoming_expirations.length === 0 ? (
-              <Empty icon={<CheckCircle2 className="h-5 w-5" />} title="Nothing in the next 60 days" message="No lease expirations coming up." />
+              <Empty icon={<CheckCircle2 className="h-5 w-5" />} title="Nada en 60 días" message="No hay contratos por vencer." />
             ) : (
               <ul className="divide-y">
                 {summary.upcoming_expirations.map((l) => {
@@ -199,7 +201,7 @@ export function DashboardPage({ navigate }: { navigate: (to: string) => void }) 
                           "text-muted-foreground",
                           days <= 14 && "text-destructive font-medium",
                         )}>
-                          {days < 0 ? "Already ended" : days === 0 ? "Today" : `in ${days} day${days === 1 ? "" : "s"}`}
+                          {days < 0 ? "Ya terminó" : days === 0 ? "Hoy" : `en ${days} ${days === 1 ? "día" : "días"}`}
                         </div>
                       </div>
                     </li>
@@ -325,7 +327,7 @@ function PriorityBadge({ priority }: { priority: string }) {
       map[priority] ?? map.normal,
     )}>
       {priority === "urgent" && <CircleAlert className="h-3 w-3" />}
-      {priority}
+      {priorityLabel(priority)}
     </span>
   );
 }
@@ -338,5 +340,5 @@ function StatusBadge({ status }: { status: string }) {
     completed: "outline",
     cancelled: "outline",
   };
-  return <Badge variant={(map[status] ?? "secondary") as never} className="capitalize">{status.replace("_", " ")}</Badge>;
+  return <Badge variant={(map[status] ?? "secondary") as never}>{workStatusLabel(status)}</Badge>;
 }

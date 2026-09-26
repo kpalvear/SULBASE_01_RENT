@@ -49,6 +49,11 @@ if (jwtSecret) {
   console.warn("Aviso: sin SUPABASE_JWT_SECRET en .env; el Worker usará solo JWKS si hay token ES256.");
 }
 
+const firmaKey = process.env.FIRMA_API_KEY?.trim() || readDevVar(devVarsPath, "FIRMA_API_KEY");
+const firmaWebhook = process.env.FIRMA_WEBHOOK_SECRET?.trim() || readDevVar(devVarsPath, "FIRMA_WEBHOOK_SECRET");
+if (firmaKey) lines.push(`FIRMA_API_KEY=${quote(firmaKey)}`);
+if (firmaWebhook) lines.push(`FIRMA_WEBHOOK_SECRET=${quote(firmaWebhook)}`);
+
 writeFileSync(devVarsPath, lines.join("\n") + "\n", "utf8");
 console.log("Escrito:", devVarsPath);
 
@@ -69,8 +74,8 @@ console.log(`
 Modo B listo para: pnpm dev
 
 Supabase Dashboard → Authentication → URL configuration:
-  • Redirect URLs: http://localhost:5173/**
-  • Site URL (lab): http://localhost:5173  (o mantén prod y usa el mail con redirect local)
+  • Redirect URLs: http://localhost:5173/**  (la app vive en /app)
+  • Site URL (lab): http://localhost:5173/app  (o mantén prod y usa el mail con redirect local)
 
 Opcional: desactiva "Confirm email" en Email provider para no depender del correo.
 `);
@@ -78,4 +83,18 @@ Opcional: desactiva "Confirm email" en Email provider para no depender del corre
 function quote(value) {
   if (/[\s#"']/.test(value)) return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   return value;
+}
+
+/** Keep firma.dev secrets when regenerating `.dev.vars` (from .env or the file you edited). */
+function readDevVar(path, key) {
+  if (!existsSync(path)) return "";
+  const line = readFileSync(path, "utf8")
+    .split("\n")
+    .find((row) => row.startsWith(`${key}=`));
+  if (!line) return "";
+  const raw = line.slice(key.length + 1).trim();
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    return raw.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+  return raw;
 }

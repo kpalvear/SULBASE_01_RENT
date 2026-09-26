@@ -164,9 +164,9 @@ export function PropertyDialog({ open, onOpenChange, property, onSaved }: Props)
               Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !name.trim()}>
-            {property ? "Save changes" : "Create property"}
+            {property ? "Guardar cambios" : "Crear propiedad"}
           </Button>
         </DialogFooter>
       </DialogContent>

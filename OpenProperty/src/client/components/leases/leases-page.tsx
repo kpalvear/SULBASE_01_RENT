@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, Plus, Search } from "lucide-react";
 import { useApp } from "@/context";
-import { cn, daysBetween, formatDate, formatMoney, toIsoDate } from "@/lib/utils";
+import { daysBetween, formatDate, formatMoney, toIsoDate } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LeaseDialog } from "./lease-dialog";
 import type { Lease, LeaseStatus } from "@/types";
 import { PageShell } from "@/components/page-shell";
+import { leaseStatusLabel } from "@/lib/labels";
 
 const STATUS_TONE: Record<string, string> = {
   active: "default",
@@ -56,12 +57,12 @@ export function LeasesPage({ navigate }: { navigate: (to: string) => void }) {
 
   return (
     <PageShell
-      title="Leases"
-      meta={`${leases.length} total · ${leases.filter((l) => l.status === "active").length} active`}
+      title="Contratos"
+      meta={`${leases.length} en total · ${leases.filter((l) => l.status === "active").length} activos`}
       actions={
         leases.length > 0 ? (
           <Button onClick={() => { setEditing(undefined); setDialogOpen(true); }}>
-            <Plus className="h-4 w-4" /> New lease
+            <Plus className="h-4 w-4" /> Nuevo contrato
           </Button>
         ) : null
       }
@@ -70,28 +71,28 @@ export function LeasesPage({ navigate }: { navigate: (to: string) => void }) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <Tabs value={filter} onValueChange={(v) => setFilter(v as LeaseStatus | "all")}>
             <TabsList>
-              <TabsTrigger value="active">Active</TabsTrigger>
-              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-              <TabsTrigger value="ended">Ended</TabsTrigger>
-              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="active">Activos</TabsTrigger>
+              <TabsTrigger value="upcoming">Próximos</TabsTrigger>
+              <TabsTrigger value="ended">Terminados</TabsTrigger>
+              <TabsTrigger value="all">Todos</TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="relative md:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search leases" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+            <Input placeholder="Buscar contratos" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
         </div>
 
         {loading ? (
-          <Card className="p-8 text-center text-sm text-muted-foreground">Loading…</Card>
+          <Card className="p-8 text-center text-sm text-muted-foreground">Cargando…</Card>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center">
             <ClipboardList className="size-7 text-faint" aria-hidden />
-            <p className="font-medium">No leases here</p>
-            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">{leases.length === 0 ? "Create your first lease to start collecting rent." : "Try a different filter."}</p>
+            <p className="font-medium">No hay contratos</p>
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">{leases.length === 0 ? "Crea el primer contrato para empezar a cobrar renta." : "Prueba otro filtro."}</p>
             {leases.length === 0 && (
               <Button className="mt-2" onClick={() => { setEditing(undefined); setDialogOpen(true); }}>
-                <Plus className="mr-1 h-4 w-4" /> New lease
+                <Plus className="mr-1 h-4 w-4" /> Nuevo contrato
               </Button>
             )}
           </div>
@@ -100,11 +101,11 @@ export function LeasesPage({ navigate }: { navigate: (to: string) => void }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Property · Unit</TableHead>
-                  <TableHead>Term</TableHead>
-                  <TableHead className="text-right">Rent</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Inquilino</TableHead>
+                  <TableHead>Propiedad · Unidad</TableHead>
+                  <TableHead>Vigencia</TableHead>
+                  <TableHead className="text-right">Renta</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -128,7 +129,7 @@ export function LeasesPage({ navigate }: { navigate: (to: string) => void }) {
                             {l.tenant_first_name} {l.tenant_last_name}
                           </button>
                         ) : (
-                          <span className="text-xs text-muted-foreground">No tenant</span>
+                          <span className="text-xs text-muted-foreground">Sin inquilino</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -140,12 +141,12 @@ export function LeasesPage({ navigate }: { navigate: (to: string) => void }) {
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{formatDate(l.start_date)} → {formatDate(l.end_date)}</div>
-                        {ending && <div className="text-xs text-warning">Ends in {daysToEnd} day{daysToEnd === 1 ? "" : "s"}</div>}
+                        {ending && <div className="text-xs text-warning">Termina en {daysToEnd} {daysToEnd === 1 ? "día" : "días"}</div>}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatMoney(l.monthly_rent, app.settings.currency)}/mo</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatMoney(l.monthly_rent, app.settings.currency)}/mes</TableCell>
                       <TableCell>
-                        <Badge variant={(STATUS_TONE[l.status] ?? "secondary") as never} className={cn("capitalize")}>
-                          {l.status}
+                        <Badge variant={(STATUS_TONE[l.status] ?? "secondary") as never}>
+                          {leaseStatusLabel(l.status)}
                         </Badge>
                       </TableCell>
                     </TableRow>

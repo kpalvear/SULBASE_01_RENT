@@ -4,13 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n ui,api -c cyan,green \"vite\" \"wrangler dev --port 8787\"",
+    "dev": "concurrently -k -n ui,api -c cyan,green --restart-tries 3 --restart-after 1500 \"vite\" \"wrangler dev --port 8787\"",
     "prepare:local-auth": "node scripts/prepare-local-auth.mjs",
     "dev:auth": "node scripts/prepare-local-auth.mjs && pnpm dev",
     "db:migrate:d1": "wrangler d1 execute open-property-db --local --file=src/server/schema.sql",
     "db:pg:generate": "drizzle-kit generate",
     "db:pg:migrate": "drizzle-kit migrate",
-    "build": "vite build",
+    "build": "node scripts/build-web.mjs",
     "deploy": "pnpm build && wrangler deploy",
     "preview:worker": "pnpm build && wrangler preview",
     "typecheck": "tsc --noEmit",
@@ -42,6 +42,7 @@
     "postgres": "^3.4.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router": "^7.18.4",
     "tailwind-merge": "^2.2.0",
     "zod": "^3.24.0"
   },

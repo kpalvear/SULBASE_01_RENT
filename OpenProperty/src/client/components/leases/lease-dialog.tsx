@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
+import { LeaseSignaturePanel } from "@/components/leases/lease-signature-panel";
 import type { Lease, LeaseStatus, Tenant, Unit } from "@/types";
 
 interface Props {
@@ -148,7 +150,7 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{lease ? "Edit lease" : "New lease"}</DialogTitle>
         </DialogHeader>
@@ -224,6 +226,8 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
             <Label htmlFor="l-notes">Notes</Label>
             <Textarea id="l-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
+          {lease && <DocumentsPanel entityType="lease" entityId={lease.id} />}
+          {lease && <LeaseSignaturePanel lease={lease} />}
         </div>
         <DialogFooter className="mt-2">
           {lease && (
@@ -231,9 +235,9 @@ export function LeaseDialog({ open, onOpenChange, lease, defaults, onSaved }: Pr
               Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !unitId || !start || !end}>
-            {lease ? "Save changes" : "Create lease"}
+            {lease ? "Guardar cambios" : "Crear contrato"}
           </Button>
         </DialogFooter>
       </DialogContent>

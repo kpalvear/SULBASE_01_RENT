@@ -8,7 +8,13 @@ import { mountVendorsRoutes } from "./vendors";
 import { mountWorkOrdersRoutes } from "./work-orders";
 import { mountApplicationsRoutes } from "./applications";
 import { mountDashboardRoutes } from "./dashboard";
+import { mountAccountRoutes } from "./account";
+import { mountMemberRoutes } from "./members";
 import { mountSettingsRoutes } from "./settings";
+import { mountDocumentsRoutes } from "./documents";
+import { mountMessageRoutes } from "./messages";
+import { mountNotificationRoutes } from "./notifications";
+import { mountFirmaWebhookRoute, mountSignatureRoutes } from "./signatures";
 
 import type { Hono } from "hono";
 import type { AppEnv } from "../env";
@@ -24,5 +30,12 @@ export function registerApiRoutes(app: Hono<AppEnv>) {
   mountWorkOrdersRoutes(app);
   mountApplicationsRoutes(app);
   mountDashboardRoutes(app);
+  mountAccountRoutes(app);
   mountSettingsRoutes(app);
+  mountMemberRoutes(app);
+  mountDocumentsRoutes(app);
+  mountNotificationRoutes(app);
+  mountMessageRoutes(app);
+  mountSignatureRoutes(app);
+  mountFirmaWebhookRoute(app);
 }

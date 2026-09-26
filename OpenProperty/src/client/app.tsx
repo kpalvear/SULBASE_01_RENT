@@ -12,24 +12,30 @@ import { TenantPage } from "./components/tenants/tenant-page";
 import { LeasesPage } from "./components/leases/leases-page";
 import { RentPage } from "./components/rent/rent-page";
 import { MaintenancePage } from "./components/maintenance/maintenance-page";
+import { MessagesPage } from "./components/messages/messages-page";
 import { SettingsPage } from "./components/settings/settings-page";
 import { authConfigured } from "./lib/supabase";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
 import { LoginPage } from "./components/auth/login-page";
+import { NewPasswordPage } from "./components/auth/new-password-page";
 import { OrgGatePage } from "./components/auth/org-gate-page";
+import { Button } from "./components/ui/button";
+import { toAppHref } from "../shared/public-site";
+import { roleLabel } from "./lib/labels";
 
 const PORTFOLIO: AppNavItem[] = [
-  { id: "dashboard", label: "Dashboard", href: "/dashboard", home: true },
-  { id: "properties", label: "Properties", href: "/properties", icon: "building-2", color: "green" },
-  { id: "tenants", label: "Tenants", href: "/tenants", icon: "users", color: "blue" },
-  { id: "leases", label: "Leases", href: "/leases", icon: "clipboard-list", color: "violet" },
+  { id: "dashboard", label: "Panel", href: toAppHref("/dashboard"), home: true },
+  { id: "properties", label: "Propiedades", href: toAppHref("/properties"), icon: "building-2", color: "green" },
+  { id: "tenants", label: "Inquilinos", href: toAppHref("/tenants"), icon: "users", color: "blue" },
+  { id: "leases", label: "Contratos", href: toAppHref("/leases"), icon: "clipboard-list", color: "violet" },
 ];
 const OPERATIONS: AppNavItem[] = [
-  { id: "rent", label: "Rent", href: "/rent", icon: "dollar-sign", color: "amber" },
-  { id: "maintenance", label: "Maintenance", href: "/maintenance", icon: "list-checks", color: "orange" },
+  { id: "rent", label: "Rentas", href: toAppHref("/rent"), icon: "dollar-sign", color: "amber" },
+  { id: "maintenance", label: "Mantenimiento", href: toAppHref("/maintenance"), icon: "list-checks", color: "orange" },
+  { id: "messages", label: "Correo", href: toAppHref("/messages"), icon: "mail", color: "blue" },
 ];
 const ADMIN: AppNavItem[] = [
-  { id: "settings", label: "Settings", href: "/settings", icon: "settings" },
+  { id: "settings", label: "Ajustes", href: toAppHref("/settings"), icon: "settings" },
 ];
 
 function activeFor(route: Route): string {
@@ -38,7 +44,13 @@ function activeFor(route: Route): string {
   return route.name;
 }
 
+const DOCUMENT_TITLE = "RENT";
+
 export function App() {
+  useEffect(() => {
+    document.title = DOCUMENT_TITLE;
+  }, []);
+
   return (
     <AuthProvider>
       <AppRoot />
@@ -53,14 +65,36 @@ function AppRoot() {
     if (auth.loading) {
       return (
         <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-          Loading…
+          Cargando…
         </div>
       );
+    }
+    if (auth.needsNewPassword && auth.session) {
+      return <NewPasswordPage />;
     }
     if (!auth.session && !auth.devBypass) {
       return <LoginPage />;
     }
     if (auth.session && !auth.devBypass && !auth.organizationId) {
+      if (auth.profileError) {
+        return (
+          <div className="flex min-h-screen items-center justify-center bg-background p-6">
+            <div className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-card p-8">
+              <h1 className="text-xl font-semibold">No se pudo abrir tu organización</h1>
+              <p className="text-sm text-muted-foreground">
+                La cuenta sigue vinculada. Esto no es un alta nueva.
+              </p>
+              <p className="text-sm text-destructive">{auth.profileError}</p>
+              <Button type="button" className="w-full" onClick={() => void auth.refreshProfile()}>
+                Reintentar
+              </Button>
+              <Button type="button" variant="ghost" className="w-full" onClick={() => void auth.signOut()}>
+                Cerrar sesión
+              </Button>
+            </div>
+          </div>
+        );
+      }
       return <OrgGatePage />;
     }
   }
@@ -79,8 +113,8 @@ function AuthenticatedShell() {
 
   const groups = [
     { items: PORTFOLIO },
-    { label: "Operations", items: OPERATIONS },
-    { label: "Admin", items: ADMIN },
+    { label: "Operación", items: OPERATIONS },
+    { label: "Administración", items: ADMIN },
   ];
 
   return (
@@ -88,7 +122,7 @@ function AuthenticatedShell() {
       <div className="flex h-screen min-h-0 flex-col overflow-hidden bg-background text-foreground md:flex-row">
         <div className="flex shrink-0">
           <AppNav
-            title="OpenProperty"
+            title="RENT"
             icon="home"
             groups={groups}
             active={activeFor(route)}
@@ -98,15 +132,15 @@ function AuthenticatedShell() {
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {auth.session && auth.organizationId && (
             <div className="flex items-center justify-end gap-2 border-b border-border px-4 py-2 text-xs text-muted-foreground">
-              <span>{auth.role}</span>
+              <span>{roleLabel(auth.role ?? "")}</span>
               <button type="button" className="underline" onClick={() => void auth.signOut()}>
-                Sign out
+                Cerrar sesión
               </button>
             </div>
           )}
           {state.loading ? (
             <div className="flex flex-1 items-center justify-center text-muted-foreground">
-              Loading…
+              Cargando…
             </div>
           ) : (
             <>
@@ -118,9 +152,10 @@ function AuthenticatedShell() {
               {route.name === "leases" && <LeasesPage navigate={navigate} />}
               {route.name === "rent" && <RentPage />}
               {route.name === "maintenance" && <MaintenancePage />}
+              {route.name === "messages" && <MessagesPage />}
               {route.name === "settings" && <SettingsPage />}
               {route.name === "not-found" && (
-                <Placeholder title="Not found" message="That page doesn't exist." />
+                <Placeholder title="No encontrada" message="Esa página no existe." />
               )}
             </>
           )}

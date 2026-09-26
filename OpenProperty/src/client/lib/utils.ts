@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { getFormatPrefs } from "./format-prefs";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -28,18 +29,29 @@ export function colorClasses(token: string | null | undefined): typeof colorPale
   return colorPalette[(token as ColorToken)] ?? colorPalette.sky;
 }
 
-/** Format an ISO date string 'YYYY-MM-DD' or full datetime to a short date label. */
+/** Format an ISO date using the organization date format. */
 export function formatDate(iso: string | null | undefined, opts?: Intl.DateTimeFormatOptions): string {
   if (!iso) return "";
   const d = new Date(iso.length <= 10 ? `${iso}T00:00:00` : iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, opts ?? { year: "numeric", month: "short", day: "numeric" });
+  if (opts) {
+    const locale = getFormatPrefs().language === "en" ? "en-US" : "es-MX";
+    return d.toLocaleDateString(locale, opts);
+  }
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = String(d.getFullYear());
+  const pattern = getFormatPrefs().dateFormat;
+  if (pattern === "MM/dd/yyyy") return `${month}/${day}/${year}`;
+  if (pattern === "yyyy-MM-dd") return `${year}-${month}-${day}`;
+  return `${day}/${month}/${year}`;
 }
 
-/** Format a number as currency. Uses USD by default. */
-export function formatMoney(n: number | null | undefined, currency = "USD"): string {
+/** Format a number as currency. Falls back to MXN when the organization has no code. */
+export function formatMoney(n: number | null | undefined, currency = "MXN"): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+  const locale = getFormatPrefs().language === "en" ? "en-US" : "es-MX";
+  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
 }
 
 /** YYYY-MM-DD for a given Date in local time. */
@@ -62,11 +74,12 @@ export function addMonths(period: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-/** Pretty 'April 2026' for 'YYYY-MM'. */
+/** Pretty month name for 'YYYY-MM', in the organization language. */
 export function formatPeriod(period: string): string {
   const [y, m] = period.split("-").map(Number);
   const d = new Date(y, m - 1, 1);
-  return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  const locale = getFormatPrefs().language === "en" ? "en-US" : "es-MX";
+  return d.toLocaleDateString(locale, { month: "long", year: "numeric" });
 }
 
 /** Days between two ISO dates (positive = b after a). */

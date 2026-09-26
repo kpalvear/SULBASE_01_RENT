@@ -4,12 +4,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { api } from "../api";
-import { getEmailRedirectUrl } from "../lib/auth-redirect";
+import { getEmailRedirectUrl, peekAuthCallbackType } from "../lib/auth-redirect";
 import { establishSessionFromUrl } from "../lib/auth-session";
 import { authConfigured, getSupabase } from "../lib/supabase";
 import { getStoredOrganizationId, setStoredOrganizationId } from "../lib/session";
@@ -28,10 +29,18 @@ type AuthState = {
   memberships: MembershipInfo[];
   organizationId: string | null;
   role: string | null;
+  /** Set when /api/me fails. Distinct from having no membership. */
+  profileError: string | null;
   devBypass: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signOutEverywhere: () => Promise<void>;
+  needsNewPassword: boolean;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  updateEmail: (email: string) => Promise<void>;
+  updateDisplayName: (name: string) => Promise<void>;
   refreshProfile: () => Promise<void>;
   setActiveOrganization: (organizationId: string) => Promise<void>;
   bootstrapOrganization: (name: string) => Promise<void>;
@@ -45,9 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [memberships, setMemberships] = useState<MembershipInfo[]>([]);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [devBypass, setDevBypass] = useState(!authConfigured);
+  const [needsNewPassword, setNeedsNewPassword] = useState(false);
+  const profileRequest = useRef(0);
 
-  const refreshProfile = useCallback(async () => {
+  const refreshProfile = useCallback(async (knownSession?: Session | null) => {
     if (!authConfigured) {
       setDevBypass(true);
       setLoading(false);
@@ -56,15 +68,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase();
     if (!supabase) return;
 
-    const { data: userData } = await supabase.auth.getUser();
-    const { data: sessionData } = await supabase.auth.getSession();
-    const current = userData.user ? sessionData.session : null;
+    const requestId = ++profileRequest.current;
+    const current =
+      knownSession !== undefined ? knownSession : (await supabase.auth.getSession()).data.session;
+    if (requestId !== profileRequest.current) return;
+
     setSession(current);
 
     if (!current) {
       setMemberships([]);
       setOrganizationId(null);
       setRole(null);
+      setProfileError(null);
       setLoading(false);
       return;
     }
@@ -80,9 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accessToken: current.access_token,
         organizationId: storedOrg,
       });
+      if (requestId !== profileRequest.current) return;
 
       if (me.mode === "dev_bypass") {
         setDevBypass(true);
+        setProfileError(null);
         setOrganizationId(me.organization_id);
         setRole(me.role);
         setMemberships([]);
@@ -90,26 +107,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setDevBypass(false);
-      setMemberships(me.memberships);
+      setProfileError(null);
+      const list = me.memberships ?? [];
+      setMemberships(list);
 
       let active = me.organization_id;
-      if (!active && me.memberships.length === 1) {
-        active = me.memberships[0].organization_id;
+      if (!active && list.length === 1) {
+        active = list[0].organization_id;
         setStoredOrganizationId(active);
       }
-      if (!active && storedOrg && me.memberships.some((m) => m.organization_id === storedOrg)) {
+      if (!active && storedOrg && list.some((m) => m.organization_id === storedOrg)) {
         active = storedOrg;
       }
 
       setOrganizationId(active);
-      setRole(me.role ?? (active && me.memberships.length === 1 ? me.memberships[0].role : null));
-    } catch {
-      setMemberships([]);
-      setOrganizationId(null);
-      setRole(null);
-      setStoredOrganizationId(null);
+      setRole(me.role ?? (active && list.length === 1 ? list[0].role : null));
+    } catch (err) {
+      if (requestId !== profileRequest.current) return;
+      setProfileError(err instanceof Error ? err.message : "No se pudo cargar la sesión");
     } finally {
-      setLoading(false);
+      if (requestId === profileRequest.current) setLoading(false);
     }
   }, []);
 
@@ -120,12 +137,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const supabase = getSupabase()!;
     void (async () => {
+      const callbackType = peekAuthCallbackType();
       await establishSessionFromUrl(supabase);
+      if (callbackType === "recovery") setNeedsNewPassword(true);
       await refreshProfile();
     })();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      void refreshProfile();
+    const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") setNeedsNewPassword(true);
+      if (event === "SIGNED_OUT") setNeedsNewPassword(false);
+      void refreshProfile(nextSession);
     });
     return () => sub.subscription.unsubscribe();
   }, [refreshProfile]);
@@ -133,9 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase();
     if (!supabase) throw new Error("Auth not configured");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    await refreshProfile();
+    await refreshProfile(data.session);
   }, [refreshProfile]);
 
   const signUp = useCallback(async (email: string, password: string) => {
@@ -149,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error) throw error;
     if (data.session) {
-      await refreshProfile();
+      await refreshProfile(data.session);
       return;
     }
     throw new Error(
@@ -157,14 +177,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }, [refreshProfile]);
 
-  const signOut = useCallback(async () => {
-    const supabase = getSupabase();
-    if (supabase) await supabase.auth.signOut();
+  const clearLocalSession = useCallback(() => {
+    setNeedsNewPassword(false);
+    setProfileError(null);
     setStoredOrganizationId(null);
     setSession(null);
     setMemberships([]);
     setOrganizationId(null);
     setRole(null);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    const supabase = getSupabase();
+    if (supabase) await supabase.auth.signOut();
+    clearLocalSession();
+  }, [clearLocalSession]);
+
+  const signOutEverywhere = useCallback(async () => {
+    const supabase = getSupabase();
+    if (supabase) await supabase.auth.signOut({ scope: "global" });
+    clearLocalSession();
+  }, [clearLocalSession]);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Auth not configured");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getEmailRedirectUrl(),
+    });
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Auth not configured");
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    setNeedsNewPassword(false);
+  }, []);
+
+  const updateEmail = useCallback(async (email: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Auth not configured");
+    const { error } = await supabase.auth.updateUser(
+      { email },
+      { emailRedirectTo: getEmailRedirectUrl() },
+    );
+    if (error) throw error;
+  }, []);
+
+  const updateDisplayName = useCallback(async (name: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error("Auth not configured");
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: name } });
+    if (error) throw error;
+    if (data.user) {
+      setSession((current) => (current ? { ...current, user: data.user } : current));
+    }
   }, []);
 
   const setActiveOrganization = useCallback(
@@ -208,10 +277,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberships,
       organizationId,
       role,
+      profileError,
       devBypass,
       signIn,
       signUp,
       signOut,
+      signOutEverywhere,
+      needsNewPassword,
+      requestPasswordReset,
+      updatePassword,
+      updateEmail,
+      updateDisplayName,
       refreshProfile,
       setActiveOrganization,
       bootstrapOrganization,
@@ -222,10 +298,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberships,
       organizationId,
       role,
+      profileError,
       devBypass,
       signIn,
       signUp,
       signOut,
+      signOutEverywhere,
+      needsNewPassword,
+      requestPasswordReset,
+      updatePassword,
+      updateEmail,
+      updateDisplayName,
       refreshProfile,
       setActiveOrganization,
       bootstrapOrganization,

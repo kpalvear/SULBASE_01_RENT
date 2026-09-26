@@ -1,17 +1,51 @@
 name = "rent"
 main = "src/server/index.ts"
+workers_dev = true
+preview_urls = true
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
-# SPA (Vite) + API Hono en /api/* — Postgres vía Supabase pooler o Hyperdrive
+# Landing estática en / y SPA en /app. Sin fallback global: /app/* lo resuelve el Worker.
+# El redirect de workers.dev permanece apagado hasta que rent.sulbase.com responda
+# y Supabase acepte https://rent.sulbase.com/app (el hash de auth no sobrevive un 301).
 [assets]
 directory = "./dist"
-not_found_handling = "single-page-application"
 binding = "ASSETS"
-run_worker_first = ["/api/*"]
+run_worker_first = [
+  "/api/*",
+  "/",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/llms.txt",
+  "/icon.svg",
+  "/app",
+  "/app/*",
+  "!/app/assets/*",
+  "/dashboard",
+  "/properties",
+  "/properties/*",
+  "/tenants",
+  "/tenants/*",
+  "/leases",
+  "/rent",
+  "/maintenance",
+  "/messages",
+  "/settings",
+]
+
+# Zona sulbase.com en la misma cuenta de Cloudflare. El primer deploy de producción
+# crea el DNS y el certificado. `wrangler preview` no debe robar este hostname.
+[[routes]]
+pattern = "rent.sulbase.com"
+custom_domain = true
 
 [vars]
 DEV_ORGANIZATION_SLUG = "dev"
+CANONICAL_REDIRECT = "false"
+
+# Buzón: una pasada diaria a las 13:00 UTC (08:00 en UTC−5). El handler inserta lotes pequeños.
+[triggers]
+crons = ["0 13 * * *"]
 
 [observability]
 enabled = true
@@ -23,3 +57,10 @@ enabled = true
 # [[hyperdrive]]
 # binding = "HYPERDRIVE"
 # id = "<hyperdrive-config-id>"
+
+# Bucket privado. `wrangler dev` simula el binding en local (preview_bucket_name).
+# Crear antes del deploy: `wrangler r2 bucket create rent-files` y `wrangler r2 bucket create rent-files-dev`.
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "rent-files"
+preview_bucket_name = "rent-files-dev"

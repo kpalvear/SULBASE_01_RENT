@@ -3,6 +3,8 @@
 Plataforma de gestión de propiedades **100 % edge**: Cloudflare Workers + Supabase (Postgres), con Hono y Drizzle ORM.
 Este archivo es la fuente de verdad del proyecto. Cualquier asistente de IA debe leerlo antes de tocar código.
 
+> **Histórico:** copia del plan anterior (pre-acotación Fase 6 / frontend público) en [`AGENTS.plan-anterior.txt`](./AGENTS.plan-anterior.txt).
+
 > **Prevalencia:** las decisiones de la sección 1 reemplazan a las de la arquitectura anterior (Railway + Node/Bun).
 > Lo demás de esa arquitectura (validación, Hono RPC, migraciones versionadas, CI, GEO) se conserva, adaptado.
 
@@ -16,11 +18,16 @@ Este archivo es la fuente de verdad del proyecto. Cualquier asistente de IA debe
 | Base de datos | **Supabase (PostgreSQL)** |
 | ORM | **Drizzle ORM** |
 | Conexión a BD | Hyperdrive o el pooler de Supabase; nunca un pool persistente |
-| Archivos | R2 o Supabase Storage |
+| Archivos | **Cloudflare R2** (binding `FILES`); bucket privado, descarga vía Worker. No usar Supabase Storage |
+| Firma electrónica | **[firma.dev](https://docs.firma.dev)** (API REST + webhooks HMAC); el PDF firmado se archiva en R2 |
 | Tareas en segundo plano | Cloudflare Queues + Cron Triggers, en lotes pequeños |
 | Base de código | **OpenProperty** (clawnify), portado de D1/SQLite a Postgres |
 | Referencia de lógica | **Condo** (open-condo-software), solo como referencia de lectura |
 | Agente de desarrollo | Cursor, con las skills de `.agents/skills/` |
+| Marca producto | **RENT** (Sulbase); dejar de usar “OpenProperty” en UI y metadatos al actualizar |
+| Dominio producción | **`https://rent.sulbase.com`** (canónico); `*.workers.dev` solo transitorio en lab |
+| Idioma y unidades | **Español** en producto; **sistema métrico** (m², km, °C, formatos locales) |
+| Modelo de acceso | **App cerrada** tras login; API privada (JWT + org). Superficie pública mínima: landing informativa |
 
 ## 2. Punto de partida: OpenProperty
 
@@ -57,12 +64,16 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 ## 4. Arquitectura por capas
 
 ### 4.1 Frontend
-- **Fase 1:** conservar el cliente Vite + React de OpenProperty (área privada, tras login).
-- **Decisión abierta:** SSR con Remix / React Router v7 para páginas públicas y comerciales (SEO + GEO). Si se adopta: contenido comercial siempre renderizado en servidor, `meta`/Open Graph/canonical por ruta, `sitemap.xml` generado.
-- Alojamiento: Cloudflare Workers con activos estáticos (o Pages), con Preview URL por rama/PR.
+- **App (ahora):** conservar el cliente Vite + React de OpenProperty como **SPA privada** tras login (router actual hasta migrar). Sin SSR en el panel; `noindex` en el shell de la app cuando se implemente la separación de rutas.
+- **Rutas objetivo en producción:** `/` = landing pública (HTML legible para humanos y agentes); **`/app/*`** = SPA de gestión + login. Evita que crawlers indexen el login como “home”.
+- **Landing y marketing (después del producto interior):** sitio público con **React Router v7** en Cloudflare Workers (SSR o pre-render por ruta), español, canonical en `rent.sulbase.com`. Precios, disponibilidad y páginas comerciales extra entran **después** de cerrar funcionalidad core.
+- **No usar Remix** en este proyecto; el stack público futuro es **React Router v7** (mismo Worker: `run_worker_first` en `/api/*` como hoy).
+- Alojamiento: Cloudflare Workers con activos estáticos, Preview URL por rama/PR.
 
 ### 4.2 Backend (Core API)
-- Hono en Workers. Estructura por dominio: `properties`, `units`, `tenants`, `leases`, `rent`, `payments`, `vendors`, `maintenance`, `applications`, `settings`.
+- Hono en Workers. Estructura por dominio: `properties`, `units`, `tenants`, `leases`, `rent`, `payments`, `vendors`, `maintenance`, `applications`, `settings` y, desde la Fase 6B, `documents`, `signatures`, `notifications`, `messages`, `account`.
+- **Webhooks entrantes** (`/api/webhooks/*`): fuera del middleware de organización, autenticados por firma HMAC del proveedor e idempotentes por identificador de entrega.
+- **Cron Triggers** para generar alertas del buzón en lotes pequeños (cargos vencidos, contratos por expirar, órdenes sin asignar).
 - **Hono RPC:** los tipos del backend se importan en el frontend; si la API cambia, el typecheck rompe el build.
 - **Validación con Zod en cada endpoint.**
 - **Rate limiting** en endpoints públicos y de autenticación (mecanismo de Cloudflare o middleware; verificar opciones vigentes).
@@ -73,8 +84,13 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 - Supabase Postgres + Drizzle. Esquema en `src/db/schema.ts`.
 - **Migraciones versionadas en el repositorio** (`drizzle-kit generate`); prohibido modificar el esquema a mano en producción.
 - Migraciones aplicadas desde CI o local, nunca desde el Worker.
-- Usar la URL con pooling (Hyperdrive o el pooler de Supabase, puerto 6543).
+- Usar la URL con pooling (Hyperdrive o el pooler de Supabase, puerto 6543). **Desarrollo y lab:** pooler **6543** en `.dev.vars` / `wrangler secret put DATABASE_URL`. **Hyperdrive en el Worker de producción:** obligatorio en el checklist **antes del lanzamiento** (§8); no bloquea trabajo local.
 - **Plan Free de Supabase, sin gasto.** Un solo proyecto activo hasta el lanzamiento (lab, preview, staging y desarrollo comparten la misma BD). Antes de producción real, crear un segundo proyecto Free solo para datos de usuarios (máximo dos activos en el plan). No hay backups automáticos ni PITR: copia con `db dump` fuera del repo y probar restauración. Un proyecto Free se pausa tras una semana sin actividad.
+
+### 4.3.1 Archivos (R2)
+- **Todo archivo va a R2**: imágenes de propiedades y unidades, escrituras, certificados, facturas y contratos firmados. Binding `FILES` en `wrangler.toml`; bucket por entorno.
+- Los metadatos viven en Postgres (`documents`); R2 guarda solo el binario. La clave la genera el servidor con prefijo de organización.
+- **Bucket privado**: la descarga pasa siempre por el Worker con JWT y comprobación de organización.
 
 ### 4.4 Multi-organización y permisos
 - Añadir `organization_id` (not null) a las tablas principales y una tabla `memberships` con rol.
@@ -83,18 +99,20 @@ Repositorio en GitHub: **[sulbase/RENT](https://github.com/sulbase/RENT)**. La c
 - Roles iniciales sugeridos: `owner`, `manager`, `staff`, `viewer`.
 
 ### 4.5 Visibilidad para agentes de IA (GEO)
-- `robots.txt`: permitir los rastreadores de IA que interesen; **verificar los user-agents exactos en la documentación de cada proveedor** antes de publicar.
-- JSON-LD (schema.org) solo en páginas públicas (`Organization`, `Product`, `Offer`, `FAQPage`, `SoftwareApplication`, según el caso).
-- Acciones comerciales expuestas como endpoints `POST`/`PUT` limpios, con errores claros e idempotencia donde aplique.
-- OpenAPI generado desde Hono (p. ej. con `@hono/zod-openapi`).
+- **Alcance acotado:** RENT es app cerrada; GEO = **una landing** con texto completo en HTML (qué es, para quién, funciones a alto nivel, contacto, enlace a login). No indexar panel ni `/api/*`.
+- `robots.txt`: `Allow: /` en la landing; `Disallow: /app/`, `/api/`; ampliar cuando existan precios/legal. Rastreadores de IA: allow explícito solo si interesa; **verificar user-agents** en la documentación de cada proveedor antes de publicar.
+- Opcional en la landing: `llms.txt` con resumen y URL canónica.
+- JSON-LD solo en la landing (`Organization`, `SoftwareApplication`; `Offer` cuando haya precios reales).
+- **OpenAPI público:** aplazado. La API sigue documentada vía Hono RPC para la app; un spec HTTP público (`@hono/zod-openapi`) solo si más adelante hay integraciones externas o endpoints comerciales self-serve.
 
 ## 5. Flujo de trabajo
 
 - **GitHub:** repositorio **[sulbase/RENT](https://github.com/sulbase/RENT)** y operaciones (`gh`, push, PR) con la cuenta **[sulbase](https://github.com/sulbase)** — no `kpalvear`. Commits con autor `324332889+sulbase@users.noreply.github.com` (configuración **local** del repo: `git config user.email` / `user.name`).
-- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Producción (edge):** solo **GitHub Actions** — cada push a `main` → jobs `verify` luego `deploy` en `.github/workflows/ci.yml` (`npm run build` + `npm run deploy` desde la raíz del repo; secrets `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`). URL: `https://rent.sistemas-d5d.workers.dev`. **Preview antes de merge:** job `preview` en pull requests (`wrangler preview`). **No usar Workers Builds** en este repo (desconectar Git en el dashboard del Worker `rent` → Settings → Build) para evitar doble deploy y un segundo token; otros proyectos de la cuenta pueden seguir con Builds. D1 solo en `wrangler dev -e local` hasta Fase 2. Secretos de app: `wrangler secret put`, nunca en git.
-- **Postgres en producción:** el deploy de GitHub **no** configura la base de datos. Tras el primer deploy (o al cambiar de proyecto Supabase), ejecutar `wrangler secret put DATABASE_URL` con la URL del **transaction pooler** de Supabase (puerto **6543**, `?pgbouncer=true`). Sin ese secreto, el Worker arranca pero `/api/*` falla al conectar. En local, copiar `OpenProperty/.dev.vars.example` → `.dev.vars` con la misma URL. Las migraciones Drizzle se aplican **fuera** del Worker (local o CI dedicado), no en el job `deploy`.
+- **Cloudflare:** Worker en `OpenProperty/` (`wrangler.toml`, nombre `rent`). **Producción (edge):** solo **GitHub Actions** — cada push a `main` → jobs `verify` luego `deploy` en `.github/workflows/ci.yml` (`npm run build` + `npm run deploy` desde la raíz del repo; secrets `CLOUDFLARE_API_TOKEN` y `CLOUDFLARE_ACCOUNT_ID`). URL canónica: **`https://rent.sulbase.com`** (configurar custom domain en el Worker); hasta entonces lab en `https://rent.sistemas-d5d.workers.dev`. **Preview antes de merge:** job `preview` en pull requests (`wrangler preview`). **No usar Workers Builds** en este repo (desconectar Git en el dashboard del Worker `rent` → Settings → Build) para evitar doble deploy y un segundo token; otros proyectos de la cuenta pueden seguir con Builds. D1 solo en `wrangler dev -e local` hasta Fase 2. Secretos de app: `wrangler secret put`, nunca en git.
+- **Postgres en producción:** el deploy de GitHub **no** configura la base de datos. Tras el primer deploy (o al cambiar de proyecto Supabase), ejecutar `wrangler secret put DATABASE_URL` con la URL del **transaction pooler** de Supabase (puerto **6543**, `?pgbouncer=true`). Sin ese secreto, el Worker arranca pero `/api/*` falla al conectar. En local, `pnpm run prepare:local-auth` (desde `.env` con `DATABASE_POOLED_URL`) o la misma URL 6543 en `.dev.vars`. Las migraciones Drizzle usan **5432** en `.env` y se aplican **fuera** del Worker (local o CI dedicado), no en el job `deploy`. **Hyperdrive:** activar en Cloudflare y `wrangler.toml` **antes del lanzamiento** (checklist §8); hasta entonces prod con pooler 6543 es válido.
 - **Auth en producción:** `wrangler secret put SUPABASE_JWT_SECRET` (JWT Secret del proyecto). Sin secret ni bypass, `/api/*` responde 401. Local sin login: `AUTH_DEV_BYPASS=true` en `.dev.vars` **solo** si no hay `SUPABASE_JWT_SECRET`. Frontend: `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` en `.env` para Vite.
-- **Local Modo B (auth como prod):** en `OpenProperty/`, `.env` con Supabase + `DATABASE_POOLED_URL`; `copy .env.local.example .env.local`; `pnpm run dev:auth` (genera `.dev.vars` y arranca Vite + `wrangler dev` en `http://localhost:5173`). Supabase Redirect URLs: `http://localhost:5173/**`.
+- **Local Modo B (auth como prod):** en `OpenProperty/`, `.env` con Supabase + `DATABASE_POOLED_URL`; `copy .env.local.example .env.local`; `pnpm run dev:auth` (genera `.dev.vars` y arranca Vite + `wrangler dev`). Landing en `http://localhost:5173/`; la SPA en `http://localhost:5173/app`. Supabase Redirect URLs: `http://localhost:5173/**`.
+- **Archivos y firma (Fase 6B):** bucket R2 creado en Cloudflare y declarado en `wrangler.toml` (`binding = "FILES"`). Las claves de firma.dev (`FIRMA_API_KEY`, `FIRMA_WEBHOOK_SECRET`) y el registro del webhook se hacen en la **Fase 7**, nunca en el cliente ni en el repositorio.
 - `main` protegida; todo entra por Pull Request con al menos una revisión humana.
 - **CI obligatorio:** typecheck, lint/formato, tests unitarios y de integración de la API, build de frontend y backend, escaneo de secretos.
 - **La IA propone, el humano aprueba.** Nunca fusionar código de IA sin revisión.
@@ -120,7 +138,7 @@ Experimentos candidatos:
 - [ ] Historial de cambios por triggers de Postgres (`*_history`) y soft delete (`deleted_at`)
 - [ ] Hono RPC + OpenAPI en paralelo sobre las mismas rutas
 - [ ] Cloudflare Queues para tareas largas (generación mensual de cargos, importaciones)
-- [ ] Subida de archivos a R2 vs. Supabase Storage
+- [x] Subida de archivos a R2 vs. Supabase Storage — **resuelto: R2** (ver decisión #12 y Fase 6B.1)
 - [ ] Skill propia `condo-port` (cuando se decida crearla)
 - [ ] Jev (TypeSafe AI) como capa de decisión: clasificar órdenes de trabajo, puntuar solicitudes, estimar riesgo de mora (ver 6.1)
 - [ ] _Por definir:_ ______________________
@@ -179,9 +197,10 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Migración aplicada al Supabase de desarrollo
 
 ### Fase 2 — Capa de datos
-- [x] Reemplazar `@clawnify/db` por Drizzle (Hyperdrive / pooler)
-- [x] `wrangler.toml` sin binding a D1; añadir Hyperdrive si aplica
+- [x] Reemplazar `@clawnify/db` por Drizzle (pooler Supabase; código listo para Hyperdrive en `resolveDatabaseUrl`)
+- [x] `wrangler.toml` sin binding a D1; conexión vía pooler **6543** en dev/lab/prod interino
 - [x] `wrangler dev` funcionando contra Supabase
+- [ ] Hyperdrive en Worker **producción** (pre-lanzamiento; ver checklist §8) — local sigue sin Hyperdrive
 
 ### Fase 3 — API
 - [x] Partir `index.ts` en módulos de rutas por dominio
@@ -203,22 +222,104 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 - [x] Rate limiting en `/api/*` y rutas auth-adjacentes (`/api/me`, `/api/auth/*`) — ver `src/server/auth/rate-limit.ts`
 - [ ] Restauración probada desde un `db dump` (procedimiento en `OpenProperty/docs/db-backup-restore.md`; ejecutar en lab)
 
-### Fase 6 — SEO y GEO (si hay páginas públicas)
-- [ ] Decisión sobre SSR con Remix / React Router v7
-- [ ] `robots.txt`, `sitemap.xml` y JSON-LD base
-- [ ] OpenAPI publicado desde Hono
-- [ ] Datos estructurados validados con una herramienta de resultados enriquecidos
+### Fase 6 — Producto interior (prioridad antes de marketing)
+- [x] Completar y pulir módulos core en la SPA (propiedades, renta, mantenimiento, etc.) — listas, panel y acciones principales en español
+- [x] Marca **RENT** en UI (sustituir referencias OpenProperty en login, nav, `index.html`, manifest)
+- [x] Español y **métrico** en formatos de la app (fechas `dd/MM/yyyy`, áreas en m², moneda de la organización; el valor por defecto de una org nueva es MXN)
+- [x] Separación de rutas `/` (landing) y `/app/*` (SPA). Las rutas antiguas redirigen a `/app/…`
 
-### Fase 7 — Funciones inspiradas en Condo (opcional)
+### Fase 6B — Documentos, firma, buzón y cuenta (plan intermedio)
+
+Objetivo: cerrar los huecos funcionales del producto interior antes de landing y GEO.
+Cada punto entra por Pull Request propio, con Zod, filtro por `organization_id` y tests de aislamiento.
+Orden sugerido: **6B.4 → 6B.1 → 6B.3 → 6B.5 → 6B.2** (lo barato primero; la firma depende de documentos en R2; el correo interno puede ir en paralelo tras alertas).
+
+#### 6B.1 Archivos e imágenes en R2
+- [x] `[[r2_buckets]]` en `OpenProperty/wrangler.toml` con `binding = "FILES"`; bucket por entorno (`rent-files-dev`, `rent-files`) y tipado en `WorkerBindings`
+- [x] Tabla `documents`: `id`, `organization_id`, `entity_type` (`property|unit|lease|tenant|work_order`), `entity_id`, `kind` (`image|deed|certificate|invoice|signed_lease|other`), `r2_key`, `filename`, `mime`, `size_bytes`, `uploaded_by`, `created_at`, `deleted_at`
+- [x] Índice por `(organization_id, entity_type, entity_id)`; clave foránea compuesta contra la entidad cuando exista su `uq_<tabla>_id_org`
+- [x] Clave R2 generada en el servidor: `org/<organization_id>/<entity_type>/<entity_id>/<uuid>-<nombre-normalizado>`. Nunca usar rutas enviadas por el cliente
+- [x] Rutas `/api/documents`: subir, listar por entidad, descargar y borrar (soft delete). Validar tipo MIME permitido, tamaño máximo y extensión
+- [x] Descarga **siempre a través del Worker** con JWT y organización comprobada; el bucket no es público
+- [x] UI: pestaña "Documentos" en propiedad, unidad y contrato; arrastrar y soltar; galería con imagen de portada
+- [x] Límite por organización (número de archivos y MB) para acotar almacenamiento y egress
+- [x] Borrado de la entidad → borrar también los objetos en R2 (o marcarlos para limpieza por Cron)
+
+#### 6B.2 Firma de contratos con firma.dev
+API verificada en docs.firma.dev **v01.38.00**: base `https://api.firma.dev/functions/v1/signing-request-api`, cabecera `Authorization` con la API key (el prefijo `Bearer` es opcional). Webhook HMAC-SHA256 sobre `{timestamp}.{body}`.
+- [x] Cliente en `src/server/integrations/firma.ts` (crear y enviar, reenviar, cancelar, descargar PDF; reintento corto ante 429)
+- [x] Tabla `lease_signatures`: `id`, `organization_id`, `lease_id`, `provider` (`firma_dev`), `provider_request_id`, `status` (`draft|sent|viewed|partially_signed|completed|declined|expired|cancelled`), `document_id` (PDF firmado en R2), `created_by`, `sent_at`, `completed_at`, `last_error`, `audit` (jsonb)
+- [x] Tabla `lease_signature_recipients`: firmante, correo, rol (`owner|tenant`), orden, estado y `signed_at`
+- [x] Tabla `firma_webhook_deliveries`: idempotencia por `X-Firma-Delivery`
+- [x] Rutas `/api/leases/:id/signature`: crear y enviar solicitud (PDF del contrato o plantilla), consultar estado, reenviar y cancelar
+- [x] Webhook `POST /api/webhooks/firma`: verificar `X-Firma-Signature` (HMAC SHA-256 sobre `{timestamp}.{body}`, tolerar la rotación con `X-Firma-Signature-Old`), rechazar marcas de tiempo antiguas e ignorar entregas repetidas por `X-Firma-Delivery`
+- [x] Eventos mínimos: `signing_request.recipient.signed` y `signing_request.completed`; al completarse, descargar el PDF final y archivarlo en R2 como `documents.kind = 'signed_lease'`
+- [x] Responder al webhook en menos de 5 segundos: confirmar primero y archivar el PDF después (`waitUntil`)
+- [x] Respetar los límites de tasa de firma.dev y registrar los fallos en el buzón (6B.3) — el cliente respeta 429; el fallo queda en `lease_signatures.last_error` y genera una alerta `signature`
+- [x] UI: estado de firma en el contrato, con historial por firmante y enlace al PDF archivado
+
+#### 6B.3 Buzón: alertas del sistema
+- [x] Tabla `notifications`: `id`, `organization_id`, `user_id` (nulo = toda la organización), `kind` (`rent_due|rent_overdue|lease_expiring|work_order|signature|system`), `title`, `body`, `severity` (`info|warning|critical`), `entity_type`, `entity_id`, `read_at`, `created_at`
+- [x] Rutas `/api/notifications`: listar con contador de no leídas, marcar una y marcar todas
+- [x] Generación con **Cron Trigger** en lotes pequeños: cargos vencidos, contratos por expirar y órdenes de trabajo sin asignar (reutilizar la lógica de `src/server/routes/rent.ts`)
+- [x] Evitar duplicados con clave lógica por `(organization_id, kind, entity_id, periodo)` y `ON CONFLICT DO NOTHING`
+- [x] Eventos de firma (6B.2) generan entradas en el buzón
+- [x] UI: campana en `page-shell` con contador, panel lateral y filtro por tipo y estado (solo alertas automáticas; distinto de la bandeja de correo 6B.5)
+
+#### 6B.4 Ajustes de cuenta y organización
+- [x] Separar superficies: `/api/settings` = organización; nueva `/api/account` = datos del usuario
+- [x] Cuenta (Supabase Auth desde el cliente): cambiar contraseña, cambiar correo con reconfirmación y nombre para mostrar en `user_metadata`
+- [x] **Recuperar contraseña** en el login (`resetPasswordForEmail` con el mismo destino que el resto de correos) — hoy no existe
+- [x] Cerrar sesión en todos los dispositivos
+- [x] Organización: nombre, zona horaria, moneda, idioma y formato de fecha y área (enlaza con "español y métrico" de la Fase 6)
+- [x] Miembros: listar `memberships`, invitar por correo, cambiar rol y quitar acceso; solo `owner` y `manager` (usar `roles.ts`)
+- [x] La organización activa se sigue resolviendo en el middleware; nunca se acepta la del cliente
+
+#### 6B.5 Mensajería tipo correo (dentro de la app)
+Modelo **correo electrónico**: hilos con asunto, remitente, destinatarios, cuerpo y fecha; bandeja de entrada y enviados; responder y reenviar en el mismo hilo. Todo filtrado por `organization_id`. Los adjuntos usan `documents` (6B.1) enlazados al mensaje o al hilo.
+
+- [x] Tabla `message_threads`: `id`, `organization_id`, `subject`, `entity_type` / `entity_id` opcional (propiedad, contrato, inquilino, orden de trabajo), `created_by`, `created_at`, `last_message_at`
+- [x] Tabla `message_thread_participants`: `thread_id`, `participant_kind` (`membership` | `tenant`), `user_id` o `tenant_id`, `email` (copia para mostrar), `role` (`from|to|cc` en el primer mensaje)
+- [x] Tabla `messages`: `id`, `thread_id`, `organization_id`, `sender_user_id` (miembro de la org), `body` (texto), `created_at`; sin edición tras enviar (solo nuevos mensajes en el hilo)
+- [x] Tabla `message_reads`: `message_id`, `user_id`, `read_at` — estado leído/no leído por destinatario interno
+- [x] Rutas `/api/messages`: listar hilos (entrada / enviados), obtener hilo con mensajes, crear hilo (redactar), responder en hilo, marcar hilo o mensaje como leído
+- [x] Destinatarios: miembros de la organización (`memberships`) e **inquilinos** del directorio (`tenants` con email); validar que el inquilino pertenece a la misma org
+- [x] UI: sección **Correo** (o **Mensajes**) con lista de hilos, vista de conversación, redactar (asunto + Para/CC + cuerpo), adjuntar archivos vía API de documentos
+- [x] **Correo SMTP saliente al email del inquilino:** aplazado; el MVP es mensajería **dentro de RENT** con UX de correo. Cuando exista portal de inquilino o integración SMTP, el mismo hilo puede notificar por email
+- [x] Rate limiting en envío; tamaño máximo de cuerpo; prohibido HTML arbitrario sin sanitizar si más adelante se admite rich text
+
+#### Criterios de cierre de la Fase 6B
+- [x] Un administrador puede subir la escritura y las fotos de una propiedad, enviar el contrato a firma con firma.dev, ver la alerta de renta vencida, redactar un mensaje tipo correo a un inquilino y cambiar su contraseña, todo en español
+- [x] Tests de integración de aislamiento ampliados a `documents`, `notifications`, `message_threads` / `messages` y `lease_signatures`
+- [x] Ningún archivo accesible sin JWT y sin pertenecer a la organización propietaria
+- [x] Webhook de firma con verificación de firma probada, incluida una petición manipulada que debe rechazarse
+
+### Fase 7 — Landing y GEO (app cerrada; superficie pública mínima)
+- [x] Decisión: SPA privada; landing futura con **React Router v7** (no Remix); precios/disponibilidad después
+- [ ] Cuenta y API key de firma.dev: `wrangler secret put FIRMA_API_KEY` y `wrangler secret put FIRMA_WEBHOOK_SECRET` (nunca en el cliente ni en el repositorio). Registrar el webhook HTTPS en `https://rent.sulbase.com/api/webhooks/firma` (en lab, la URL de `workers.dev`); debe responder en menos de 5 segundos. En local, las mismas variables en `.dev.vars`. El Worker ya responde y archiva el PDF; faltan los secretos y el registro en firma.dev.
+- [x] Dominio `rent.sulbase.com` ligado al Worker `rent` (zona `sulbase.com` en Cloudflare; custom domain activo). La ruta está en `OpenProperty/wrangler.toml`.
+- [ ] Redirect desde workers.dev. `CANONICAL_REDIRECT` sigue en `"false"`: un 301 elimina el hash de los correos de Supabase. Activarlo cuando `https://rent.sulbase.com/app` esté en las Redirect URLs y `VITE_AUTH_REDIRECT_URL` apunte ahí.
+- [x] Landing en `/` (RR7 pre-render): copy en español, HTML completo para crawlers/agentes. React Router 7 prerenderiza en el build (`src/landing/`); el Worker sirve el HTML estático, sin bundle de cliente.
+- [x] SPA en `/app/*` con `noindex`; login bajo `/app`. Las rutas antiguas (`/properties`, …) redirigen a `/app/…`.
+- [x] `robots.txt`, `sitemap.xml` (solo URLs públicas), JSON-LD en la landing (`Organization` + `SoftwareApplication`, sin `Offer`)
+- [ ] Validar datos estructurados (Rich Results / Schema Markup Validator) — el JSON-LD se comprueba en test; el validador público exige la URL ya desplegada
+- [x] `llms.txt`; allow selectivo de user-agents IA en `robots.txt` (nombres publicados por OpenAI, Anthropic, Perplexity, Google, Apple, Amazon, Common Crawl, ByteDance y Meta; `/app/` y `/api/` siguen bloqueados)
+
+### Fase 8 — Comercial y API pública (cuando el producto esté listo)
+- [ ] Páginas públicas extra (precios, disponibilidad, FAQ, legal) en el sitio RR7
+- [ ] OpenAPI o endpoints comerciales self-serve solo si hay integradores o bots autorizados
+
+### Fase 9 — Funciones inspiradas en Condo (opcional)
 - [ ] Órdenes de trabajo con máquina de estados e historial
 - [ ] Soft delete y versionado
 - [ ] Roles y permisos más finos
 
 ## 8. Checklist previo al lanzamiento
 
+- [ ] **Hyperdrive (producción):** en Cloudflare Dashboard crear Hyperdrive apuntando al **transaction pooler** de Supabase (host pooler, puerto **6543**, `pgbouncer=true`); descomentar `[[hyperdrive]]` en `OpenProperty/wrangler.toml` (`binding = "HYPERDRIVE"`); deploy y comprobar `/api/health`, login y bootstrap de org. Mantener `DATABASE_URL` 6543 como respaldo o según docs vigentes de Wrangler. **Caché de consultas:** desactivada o muy acotada (app de gestión). Desarrollo local **no** requiere Hyperdrive (`prepare:local-auth` + 6543).
 - [ ] Restauración probada desde un volcado manual (`db dump`)
 - [ ] Rate limiting y validación de entrada revisados
-- [ ] Prueba de carga básica sobre la API (guía en `OpenProperty/docs/load-test.md`; ejecutar antes del lanzamiento)
+- [ ] Prueba de carga básica sobre la API (guía en `OpenProperty/docs/load-test.md`; ejecutar antes del lanzamiento; ideal comparar con/sin Hyperdrive si ya está activo)
 - [x] Aislamiento entre organizaciones verificado (tests de integración + revisión manual en lab)
 - [x] Plan de rollback documentado (`OpenProperty/docs/rollback.md`)
 
@@ -234,6 +335,11 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 | Fuga entre organizaciones | Filtro por `organization_id` + tests (y RLS si se adopta) |
 | Cambio destructivo en producción | Migraciones solo por CI; prohibido para asistentes de IA |
 | Dependencia de un proveedor | Código estándar (Hono, Drizzle, Postgres) portable |
+| Fuga de archivos entre organizaciones | Clave R2 con prefijo de organización, bucket privado y comprobación de pertenencia en cada descarga |
+| Coste de almacenamiento y egress en R2 | Límite por organización y por archivo; vigilar métricas de R2 en el dashboard |
+| Webhook de firma suplantado | Verificación HMAC obligatoria, ventana de tiempo acotada y control de entregas repetidas |
+| Contrato firmado no recuperable | El PDF final se archiva en R2 y queda enlazado al contrato; no depender solo del panel de firma.dev |
+| Mensajes visibles fuera de la organización | Hilos y participantes siempre acotados por `organization_id`; comprobar inquilino y miembro en la misma org en cada envío |
 
 ## 10. Decisiones abiertas
 
@@ -241,9 +347,15 @@ Reglas: al crear sin estado → `OPEN`; `DEFERRED` exige `deferredUntil`; cada c
 |---|---|---|
 | 1 | Permisos en la aplicación vs. RLS | Cerrado: aplicación primero; RLS opcional después |
 | 2 | Multi-organización desde el esquema inicial | Recomendado: sí |
-| 3 | SSR (Remix / RR7) para páginas públicas | Pendiente |
-| 4 | Skill comunitaria de Drizzle | Opcional, revisar antes |
-| 5 | Crear la skill propia `condo-port` | Aplazada |
-| 6 | Integrar Jev como capa de decisión | Solo experimento (sección 6.1) |
-| 7 | Plan de Supabase | Cerrado: Free para siempre. Sin PITR ni backups de pago. Un proyecto hasta lanzamiento; segundo solo para prod |
-| 8 | Segundo proyecto Supabase (prod) | Pendiente hasta pre-lanzamiento; no bloquea Fase 1 |
+| 3 | SSR / sitio público | Cerrado: **React Router v7** solo para landing/marketing; **SPA Vite** para `/app`. Sin Remix |
+| 4 | OpenAPI público desde Hono | Aplazado (Fase 8); API privada con Hono RPC |
+| 5 | Skill comunitaria de Drizzle | Opcional, revisar antes |
+| 6 | Crear la skill propia `condo-port` | Aplazada |
+| 7 | Integrar Jev como capa de decisión | Solo experimento (sección 6.1) |
+| 8 | Plan de Supabase | Cerrado: Free para siempre. Sin PITR ni backups de pago. Un proyecto hasta lanzamiento; segundo solo para prod |
+| 9 | Segundo proyecto Supabase (prod) | Pendiente hasta pre-lanzamiento; no bloquea Fase 1 |
+| 10 | Dominio y GEO | Cerrado: `rent.sulbase.com`; GEO = landing única; resto no indexable |
+| 11 | Hyperdrive vs pooler 6543 | Cerrado: **6543** en dev/lab y prod hasta pre-lanzamiento; **Hyperdrive en prod** antes del go-live (checklist §8). No sustituye migraciones en 5432 |
+| 12 | Almacenamiento de archivos | Cerrado: **R2** para todo (imágenes, escrituras, certificados, contratos firmados); binding `FILES`, bucket privado |
+| 13 | Proveedor de firma electrónica | Cerrado: **firma.dev**; webhooks con HMAC y PDF final archivado en R2 (Fase 6B.2) |
+| 14 | Mensajería con inquilinos | Cerrado: **tipo correo** en la app (hilos, asunto, bandeja entrada/enviados, miembros + inquilinos); alertas automáticas en `notifications` (6B.3); SMTP/portal inquilino después |

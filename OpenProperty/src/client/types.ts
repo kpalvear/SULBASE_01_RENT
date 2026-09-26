@@ -217,3 +217,54 @@ export type NewLease = Partial<Omit<Lease, "id" | "created_at" | "unit_name" | "
 export type NewWorkOrder = Partial<Omit<WorkOrder, "id" | "created_at" | "property_name" | "property_color" | "unit_name" | "tenant_first_name" | "tenant_last_name" | "vendor_name" | "vendor_color">> & { title: string };
 export type NewVendor = Partial<Omit<Vendor, "id" | "created_at">> & { name: string };
 export type NewApplication = Partial<Omit<Application, "id" | "created_at" | "unit_name" | "property_name">> & { first_name: string; last_name: string };
+
+export type DocumentEntityType = "property" | "unit" | "lease" | "tenant" | "work_order";
+export type DocumentKind = "image" | "deed" | "certificate" | "invoice" | "signed_lease" | "other";
+
+export interface PropertyDocument {
+  id: string;
+  entity_type: DocumentEntityType;
+  entity_id: string;
+  kind: DocumentKind;
+  filename: string;
+  mime: string;
+  size_bytes: number;
+  uploaded_by: string | null;
+  is_cover: boolean;
+  created_at: string;
+}
+
+export type LeaseSignatureStatus =
+  | "draft"
+  | "sent"
+  | "viewed"
+  | "partially_signed"
+  | "completed"
+  | "declined"
+  | "expired"
+  | "cancelled";
+
+export interface LeaseSignatureRecipient {
+  id: string;
+  signature_id: string;
+  name: string;
+  email: string;
+  role: "owner" | "tenant";
+  sort_order: number;
+  status: "pending" | "viewed" | "signed" | "declined";
+  signed_at: string | null;
+}
+
+export interface LeaseSignature {
+  id: string;
+  provider: string;
+  provider_request_id: string | null;
+  status: LeaseSignatureStatus;
+  document_id: string | null;
+  source_document_id: string | null;
+  last_error: string | null;
+  sent_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  recipients: LeaseSignatureRecipient[];
+}

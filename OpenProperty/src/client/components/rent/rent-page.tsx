@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PaymentDialog } from "./payment-dialog";
 import type { ChargeStatus, RentCharge } from "@/types";
 import { PageShell } from "@/components/page-shell";
+import { chargeStatusLabel } from "@/lib/labels";
 
 const STATUS_TONE: Record<ChargeStatus, string> = {
   open: "bg-info-tint text-info",
@@ -45,7 +46,7 @@ export function RentPage() {
     try {
       const res = await app.generateCharges(period);
       await load();
-      app.setError(res.created ? null : "All active leases already have a charge for this period.");
+      app.setError(res.created ? null : "Los contratos activos ya tienen cargo en este periodo.");
     } catch (err) {
       app.setError((err as Error).message);
     } finally {
@@ -65,14 +66,14 @@ export function RentPage() {
 
   return (
     <PageShell
-      title="Rent ledger"
-      meta="Charges and payments per period"
+      title="Rentas"
+      meta="Cargos y pagos por periodo"
       actions={
         <>
           {/* The period stepper is view state, so it sits left of the one ink
               action and names its current value rather than saying "Period". */}
           <div className="inline-flex items-center rounded-full bg-muted p-[0.1875rem]">
-            <Button variant="ghost" size="icon" onClick={() => setPeriod((p) => addMonths(p, -1))} aria-label="Previous month">
+            <Button variant="ghost" size="icon" onClick={() => setPeriod((p) => addMonths(p, -1))} aria-label="Mes anterior">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <button
@@ -87,35 +88,35 @@ export function RentPage() {
             >
               {formatPeriod(period)}
             </button>
-            <Button variant="ghost" size="icon" onClick={() => setPeriod((p) => addMonths(p, 1))} aria-label="Next month">
+            <Button variant="ghost" size="icon" onClick={() => setPeriod((p) => addMonths(p, 1))} aria-label="Mes siguiente">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
           {charges.length > 0 ? (
             <Button onClick={generate} disabled={generating}>
-              <Sparkles className="h-4 w-4" /> Generate charges
+              <Sparkles className="h-4 w-4" /> Generar cargos
             </Button>
           ) : null}
         </>
       }
     >
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Stat label="Charged" value={formatMoney(totals.charged, app.settings.currency)} />
-          <Stat label="Collected" value={formatMoney(totals.collected, app.settings.currency)} tone="positive" />
+          <Stat label="Cargos" value={formatMoney(totals.charged, app.settings.currency)} />
+          <Stat label="Cobrado" value={formatMoney(totals.collected, app.settings.currency)} tone="positive" />
           <Stat
-            label="Outstanding"
+            label="Pendiente"
             value={formatMoney(totals.outstanding, app.settings.currency)}
             tone={totals.outstanding > 0 ? "warn" : "default"}
           />
           <Stat
-            label="Overdue"
+            label="Vencido"
             value={formatMoney(totals.overdue, app.settings.currency)}
             tone={totals.overdue > 0 ? "danger" : "default"}
           />
         </section>
 
         {loading ? (
-          <Card className="divide-y divide-border overflow-hidden" role="status" aria-label="Loading rent charges">
+          <Card className="divide-y divide-border overflow-hidden" role="status" aria-label="Cargando cargos">
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="flex h-11 items-center gap-4 px-3" aria-hidden>
                 <div className="h-2.5 w-32 animate-pulse rounded-full bg-muted" />
@@ -127,12 +128,12 @@ export function RentPage() {
         ) : charges.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-20 text-center">
             <Receipt className="size-7 text-faint" aria-hidden />
-            <p className="font-medium">No rent charges for {formatPeriod(period)}</p>
+            <p className="font-medium">No hay cargos en {formatPeriod(period)}</p>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Generate charges from active leases for this month.
+              Genera los cargos de los contratos activos de este mes.
             </p>
             <Button className="mt-2" onClick={generate} disabled={generating}>
-              <Sparkles className="size-4" /> Generate charges
+              <Sparkles className="size-4" /> Generar cargos
             </Button>
           </div>
         ) : (
@@ -140,13 +141,13 @@ export function RentPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Property · Unit</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Due</TableHead>
-                  <TableHead className="text-right">Charged</TableHead>
-                  <TableHead className="text-right">Paid</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Propiedad · Unidad</TableHead>
+                  <TableHead>Inquilino</TableHead>
+                  <TableHead>Vence</TableHead>
+                  <TableHead className="text-right">Cargo</TableHead>
+                  <TableHead className="text-right">Pagado</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                  <TableHead>Estado</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -176,19 +177,19 @@ export function RentPage() {
                         {formatMoney(balance, app.settings.currency)}
                       </TableCell>
                       <TableCell>
-                        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize", STATUS_TONE[c.status])}>
-                          {c.status}
+                        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", STATUS_TONE[c.status])}>
+                          {chargeStatusLabel(c.status)}
                         </span>
                       </TableCell>
                       <TableCell>
                         {c.status !== "paid" && c.status !== "waived" && (
                           <Button size="sm" variant="outline" onClick={() => setPaymentTarget(c)}>
-                            Record payment
+                            Registrar pago
                           </Button>
                         )}
                         {(c.status === "paid" || c.amount_paid > 0) && (
                           <Button size="sm" variant="ghost" onClick={() => setPaymentTarget(c)}>
-                            View
+                            Ver
                           </Button>
                         )}
                       </TableCell>
