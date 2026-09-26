@@ -12,6 +12,7 @@ import {
   uuidParam,
   type SqlParam,
 } from "../pg";
+import { MARK_OVERDUE_FOR_ORG_SQL } from "../notifications/alerts";
 import { periodSchema, rentChargeStatusSchema } from "../schemas/common";
 import { parseJson, parseQuery } from "../validation";
 
@@ -127,12 +128,7 @@ export function mountRentRoutes(app: Hono<AppEnv>) {
       );
       if (r.changes) created++;
     }
-    await run(
-      c,
-      `UPDATE rent_charges SET status = 'overdue'
-     WHERE organization_id = $1 AND status IN ('open', 'partial') AND amount_paid < amount AND due_date < CURRENT_DATE`,
-      [o],
-    );
+    await run(c, MARK_OVERDUE_FOR_ORG_SQL, [o]);
     return c.json({ created, period });
   });
 

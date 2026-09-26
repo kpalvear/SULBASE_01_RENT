@@ -222,9 +222,9 @@ export function WorkOrderDialog({ open, onOpenChange, workOrder, defaults, onSav
               Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !title.trim()}>
-            {workOrder ? "Save changes" : "Create work order"}
+            {workOrder ? "Guardar cambios" : "Crear orden"}
           </Button>
         </DialogFooter>
       </DialogContent>

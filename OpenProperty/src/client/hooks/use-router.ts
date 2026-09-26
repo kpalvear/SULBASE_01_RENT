@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { internalFromLocation, toAppHref } from "../../shared/public-site";
 
 const UUID_SEGMENT =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
@@ -12,6 +13,7 @@ export type Route =
   | { name: "leases" }
   | { name: "rent" }
   | { name: "maintenance" }
+  | { name: "messages" }
   | { name: "settings" }
   | { name: "not-found" };
 
@@ -26,6 +28,7 @@ function parse(path: string): Route {
   if (path === "/leases") return { name: "leases" };
   if (path === "/rent") return { name: "rent" };
   if (path === "/maintenance") return { name: "maintenance" };
+  if (path === "/messages") return { name: "messages" };
   if (path === "/settings") return { name: "settings" };
   return { name: "not-found" };
 }
@@ -34,9 +37,10 @@ export function useRouter() {
   const [path, setPath] = useState<string>(() => window.location.pathname);
 
   const navigate = useCallback((to: string) => {
-    if (to === window.location.pathname) return;
-    window.history.pushState(null, "", to);
-    setPath(to);
+    const href = toAppHref(to);
+    if (href === window.location.pathname) return;
+    window.history.pushState(null, "", href);
+    setPath(href);
   }, []);
 
   useEffect(() => {
@@ -45,5 +49,5 @@ export function useRouter() {
     return () => window.removeEventListener("popstate", handler);
   }, []);
 
-  return { path, route: parse(path), navigate };
+  return { path, route: parse(internalFromLocation(path)), navigate };
 }

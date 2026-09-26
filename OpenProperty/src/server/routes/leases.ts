@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Hono } from "hono";
+import { collectCascadeKeys, deleteR2Keys } from "../documents/storage";
 import type { AppEnv } from "../env";
 import {
   buildUpdate,
@@ -141,8 +142,10 @@ export function mountLeasesRoutes(app: Hono<AppEnv>) {
     const id = uuidParam(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid ID" }, 400);
     const o = orgId(c);
+    const keys = await collectCascadeKeys(c, "lease", id);
     const r = await run(c, "DELETE FROM leases WHERE id = $1 AND organization_id = $2", [id, o]);
     if (!r.changes) return c.json({ error: "Not found" }, 404);
+    await deleteR2Keys(c.env, keys);
     return c.json({ ok: true });
   });
 }

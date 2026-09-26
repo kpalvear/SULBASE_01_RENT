@@ -20,6 +20,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { Vendor, VendorCategory } from "@/types";
 import { PageShell } from "@/components/page-shell";
+import { AccountTab } from "@/components/settings/account-tab";
+import { MembersTab } from "@/components/settings/members-tab";
+import { OrganizationTab } from "@/components/settings/organization-tab";
 
 const COLORS = ["sky", "emerald", "amber", "rose", "violet", "fuchsia", "teal", "orange", "slate"];
 
@@ -36,17 +39,29 @@ const VENDOR_CATEGORIES: { value: VendorCategory; label: string }[] = [
 export function SettingsPage() {
   return (
     <PageShell
-      title="Settings"
-      meta="Vendors and rent policy defaults"
+      title="Ajustes"
+      meta="Cuenta, organización, miembros y política de renta"
       width="max-w-5xl"
     >
 
-        <Tabs defaultValue="vendors">
+        <Tabs defaultValue="account">
           <TabsList>
-            <TabsTrigger value="vendors">Vendors</TabsTrigger>
-            <TabsTrigger value="policy">Rent policy</TabsTrigger>
+            <TabsTrigger value="account">Cuenta</TabsTrigger>
+            <TabsTrigger value="organization">Organización</TabsTrigger>
+            <TabsTrigger value="members">Miembros</TabsTrigger>
+            <TabsTrigger value="vendors">Proveedores</TabsTrigger>
+            <TabsTrigger value="policy">Política de renta</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="account" className="mt-4">
+            <AccountTab />
+          </TabsContent>
+          <TabsContent value="organization" className="mt-4">
+            <OrganizationTab />
+          </TabsContent>
+          <TabsContent value="members" className="mt-4">
+            <MembersTab />
+          </TabsContent>
           <TabsContent value="vendors" className="mt-4">
             <VendorsTab />
           </TabsContent>
@@ -228,7 +243,7 @@ function VendorDialog({
               <Trash2 className="mr-1 h-4 w-4" /> Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !name.trim()}>
             {vendor ? "Save changes" : "Create"}
           </Button>
@@ -273,7 +288,7 @@ function PolicyTab() {
         default_rent_due_day: Math.min(31, Math.max(1, parseInt(dueDay, 10) || 1)),
         late_fee_amount: parseFloat(lateFee) || 0,
         late_fee_grace_days: Math.max(0, parseInt(grace, 10) || 0),
-        currency: currency.trim().toUpperCase() || "USD",
+        currency: currency.trim().toUpperCase() || "MXN",
       });
     } catch (err) {
       app.setError((err as Error).message);
@@ -303,11 +318,11 @@ function PolicyTab() {
         </div>
         <div>
           <Label htmlFor="s-cur">Currency</Label>
-          <Input id="s-cur" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="USD" />
+          <Input id="s-cur" value={currency} onChange={(e) => setCurrency(e.target.value)} placeholder="MXN" />
         </div>
       </div>
       <div className="mt-4">
-        <Button onClick={save} disabled={saving}>Save settings</Button>
+        <Button onClick={save} disabled={saving}>Guardar ajustes</Button>
       </div>
     </Card>
   );

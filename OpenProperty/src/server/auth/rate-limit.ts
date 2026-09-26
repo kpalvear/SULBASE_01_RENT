@@ -76,3 +76,10 @@ export const authRouteRateLimit = createIpRateLimit({
   includePath: true,
   scope: "auth",
 });
+
+/** Send and reply share one bucket so a script cannot flood the mailbox. */
+export const messageSendRateLimit = createIpRateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  scope: "messages-send",
+});

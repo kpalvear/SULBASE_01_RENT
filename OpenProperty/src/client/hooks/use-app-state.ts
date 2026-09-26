@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
+import { setFormatPrefs } from "../lib/format-prefs";
 import type {
   Property,
   Unit,
@@ -21,26 +22,50 @@ export interface AppSettings {
   late_fee_amount: number;
   late_fee_grace_days: number;
   currency: string;
+  timezone: string;
+  language: "es" | "en";
+  date_format: "dd/MM/yyyy" | "MM/dd/yyyy" | "yyyy-MM-dd";
+  area_unit: "m2" | "ft2";
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   default_rent_due_day: 1,
   late_fee_amount: 50,
   late_fee_grace_days: 5,
-  currency: "USD",
+  currency: "MXN",
+  timezone: "America/Mexico_City",
+  language: "es",
+  date_format: "dd/MM/yyyy",
+  area_unit: "m2",
 };
 
 function parseSettings(raw: Record<string, string>): AppSettings {
-  const num = (key: keyof AppSettings, fallback: number) => {
+  const num = (key: "default_rent_due_day" | "late_fee_amount" | "late_fee_grace_days", fallback: number) => {
     const v = parseFloat(raw[key]);
     return Number.isFinite(v) ? v : fallback;
   };
-  return {
+  const language = raw.language === "en" ? "en" : "es";
+  const dateFormat =
+    raw.date_format === "MM/dd/yyyy" || raw.date_format === "yyyy-MM-dd"
+      ? raw.date_format
+      : "dd/MM/yyyy";
+  const areaUnit = raw.area_unit === "ft2" ? "ft2" : "m2";
+  const parsed: AppSettings = {
     default_rent_due_day: num("default_rent_due_day", DEFAULT_SETTINGS.default_rent_due_day),
     late_fee_amount: num("late_fee_amount", DEFAULT_SETTINGS.late_fee_amount),
     late_fee_grace_days: num("late_fee_grace_days", DEFAULT_SETTINGS.late_fee_grace_days),
     currency: raw.currency || DEFAULT_SETTINGS.currency,
+    timezone: raw.timezone || DEFAULT_SETTINGS.timezone,
+    language,
+    date_format: dateFormat,
+    area_unit: areaUnit,
   };
+  setFormatPrefs({
+    language: parsed.language,
+    dateFormat: parsed.date_format,
+    areaUnit: parsed.area_unit,
+  });
+  return parsed;
 }
 
 export function useAppState() {
@@ -61,6 +86,10 @@ export function useAppState() {
     setProperties(props.properties);
     setVendors(vens.vendors);
     setSettings(parseSettings(st.settings));
+  }, []);
+
+  const applySettings = useCallback((raw: Record<string, string>) => {
+    setSettings(parseSettings(raw));
   }, []);
 
   const updateSettings = useCallback(async (patch: Partial<AppSettings>) => {
@@ -258,6 +287,7 @@ export function useAppState() {
     refreshLookups,
     // settings
     updateSettings,
+    applySettings,
     // properties / units
     createProperty, updateProperty, deleteProperty,
     listUnits, createUnit, updateUnit, deleteUnit,

@@ -10,3 +10,12 @@ SUPABASE_JWT_SECRET="your-supabase-jwt-secret"
 
 # Optional: keep single-tenant dev without login (only when SUPABASE_JWT_SECRET is unset)
 # AUTH_DEV_BYPASS="true"
+
+# firma.dev — API key y secreto del webhook. Nunca en el cliente ni en git.
+# Producción: wrangler secret put FIRMA_API_KEY y wrangler secret put FIRMA_WEBHOOK_SECRET
+# Webhook HTTPS: https://rent.sulbase.com/api/webhooks/firma
+# (lab, mientras el dominio no esté: https://rent.sistemas-d5d.workers.dev/api/webhooks/firma)
+# Debe responder en menos de 5 segundos. El Worker ya confirma y archiva el PDF después.
+# Opcional aquí o en .env (prepare:local-auth las copia a .dev.vars si existen):
+# FIRMA_API_KEY="your-firma-api-key"
+# FIRMA_WEBHOOK_SECRET="your-firma-webhook-secret"

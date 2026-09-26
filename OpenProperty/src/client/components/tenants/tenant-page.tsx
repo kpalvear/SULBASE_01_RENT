@@ -45,7 +45,7 @@ export function TenantPage({ id, navigate }: { id: string; navigate: (to: string
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2">
         <p className="text-sm text-muted-foreground">Tenant not found.</p>
-        <Button variant="outline" onClick={() => navigate("/tenants")}>Back to tenants</Button>
+        <Button variant="outline" onClick={() => navigate("/tenants")}>Volver a inquilinos</Button>
       </div>
     );
   }
@@ -88,12 +88,12 @@ export function TenantPage({ id, navigate }: { id: string; navigate: (to: string
           <Card className="p-5">
             <div className="text-[1.0625rem] font-semibold leading-tight">Active lease</div>
             <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-4">
-              <Field label="Property">{activeLease.property_name ?? "—"}</Field>
-              <Field label="Unit">{activeLease.unit_name ?? "—"}</Field>
-              <Field label="Term">
+              <Field label="Propiedad">{activeLease.property_name ?? "—"}</Field>
+              <Field label="Unidad">{activeLease.unit_name ?? "—"}</Field>
+              <Field label="Vigencia">
                 {formatDate(activeLease.start_date)} → {formatDate(activeLease.end_date)}
               </Field>
-              <Field label="Monthly rent">{formatMoney(activeLease.monthly_rent, app.settings.currency)}</Field>
+              <Field label="Renta mensual">{formatMoney(activeLease.monthly_rent, app.settings.currency)}</Field>
             </div>
           </Card>
         )}
@@ -101,10 +101,10 @@ export function TenantPage({ id, navigate }: { id: string; navigate: (to: string
         <Card className="p-5">
           <h2 className="mb-3 text-[1.0625rem] font-semibold leading-tight">About</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Field label="Date of birth">{tenant.date_of_birth ? formatDate(tenant.date_of_birth) : "—"}</Field>
-            <Field label="Emergency contact">{tenant.emergency_contact || "—"}</Field>
-            <Field label="Employer">{tenant.employer || "—"}</Field>
-            <Field label="Monthly income">
+            <Field label="Fecha de nacimiento">{tenant.date_of_birth ? formatDate(tenant.date_of_birth) : "—"}</Field>
+            <Field label="Contacto de emergencia">{tenant.emergency_contact || "—"}</Field>
+            <Field label="Empleador">{tenant.employer || "—"}</Field>
+            <Field label="Ingreso mensual">
               {tenant.monthly_income != null ? formatMoney(tenant.monthly_income, app.settings.currency) : "—"}
             </Field>
           </div>
@@ -129,7 +129,7 @@ export function TenantPage({ id, navigate }: { id: string; navigate: (to: string
                       {l.property_name} · {l.unit_name}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(l.start_date)} → {formatDate(l.end_date)} · {formatMoney(l.monthly_rent, app.settings.currency)}/mo
+                      {formatDate(l.start_date)} → {formatDate(l.end_date)} · {formatMoney(l.monthly_rent, app.settings.currency)}/mes
                     </p>
                   </div>
                   <Badge variant={l.status === "active" ? "default" : "secondary"} className="capitalize">{l.status}</Badge>

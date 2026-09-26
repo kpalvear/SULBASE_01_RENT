@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Hono } from "hono";
 import type { AppEnv } from "../env";
+import { collectCascadeKeys, deleteR2Keys } from "../documents/storage";
 import { buildUpdate, get, normalizeRow, normalizeRows, orgId, query, run, uuidParam } from "../pg";
 import { parseJson } from "../validation";
 
@@ -93,11 +94,13 @@ export function mountPropertiesRoutes(app: Hono<AppEnv>) {
     const id = uuidParam(c.req.param("id"));
     if (!id) return c.json({ error: "Invalid ID" }, 400);
     const o = orgId(c);
+    const keys = await collectCascadeKeys(c, "property", id);
     const r = await run(c, "DELETE FROM properties WHERE id = $1 AND organization_id = $2", [
       id,
       o,
     ]);
     if (!r.changes) return c.json({ error: "Not found" }, 404);
+    await deleteR2Keys(c.env, keys);
     return c.json({ ok: true });
   });
 }

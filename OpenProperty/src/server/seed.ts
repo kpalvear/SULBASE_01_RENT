@@ -6,7 +6,11 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   default_rent_due_day: "1",
   late_fee_amount: "50",
   late_fee_grace_days: "5",
-  currency: "USD",
+  currency: "MXN",
+  timezone: "America/Mexico_City",
+  language: "es",
+  date_format: "dd/MM/yyyy",
+  area_unit: "m2",
 };
 
 const DEMO_PROPERTIES = [

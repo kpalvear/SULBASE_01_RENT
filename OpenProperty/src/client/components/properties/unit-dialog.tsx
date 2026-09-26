@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/context";
+import { displayToSqft, getFormatPrefs, sqftToDisplay } from "@/lib/format-prefs";
 import { Button } from "@/components/ui/button";
 import { ConfirmDelete } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
 import type { Unit, UnitStatus } from "@/types";
 
 interface Props {
@@ -41,7 +43,8 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
     setName(unit?.name ?? "");
     setBedrooms(String(unit?.bedrooms ?? 1));
     setBathrooms(String(unit?.bathrooms ?? 1));
-    setSqft(unit?.sqft ? String(unit.sqft) : "");
+    const areaUnit = getFormatPrefs().areaUnit;
+    setSqft(unit?.sqft ? String(sqftToDisplay(unit.sqft, areaUnit)) : "");
     setMarketRent(String(unit?.market_rent ?? 0));
     setStatus(unit?.status ?? "vacant");
     setNotes(unit?.notes ?? "");
@@ -56,7 +59,7 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
         name: name.trim(),
         bedrooms: parseFloat(bedrooms) || 0,
         bathrooms: parseFloat(bathrooms) || 0,
-        sqft: sqft ? parseInt(sqft, 10) : null,
+        sqft: sqft ? displayToSqft(parseFloat(sqft), getFormatPrefs().areaUnit) : null,
         market_rent: parseFloat(marketRent) || 0,
         status,
         notes: notes.trim() || null,
@@ -89,7 +92,7 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{unit ? "Edit unit" : "New unit"}</DialogTitle>
         </DialogHeader>
@@ -108,8 +111,8 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
               <Input id="unit-baths" type="number" step="0.5" value={bathrooms} onChange={(e) => setBathrooms(e.target.value)} />
             </div>
             <div>
-              <Label htmlFor="unit-sqft">Sq ft</Label>
-              <Input id="unit-sqft" type="number" value={sqft} onChange={(e) => setSqft(e.target.value)} />
+              <Label htmlFor="unit-sqft">{getFormatPrefs().areaUnit === "m2" ? "m²" : "ft²"}</Label>
+              <Input id="unit-sqft" type="number" step="0.1" value={sqft} onChange={(e) => setSqft(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -131,6 +134,7 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
             <Label htmlFor="unit-notes">Notes</Label>
             <Textarea id="unit-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
+          {unit && <DocumentsPanel entityType="unit" entityId={unit.id} />}
         </div>
         <DialogFooter className="mt-2">
           {unit && (
@@ -138,9 +142,9 @@ export function UnitDialog({ open, onOpenChange, propertyId, unit, onSaved }: Pr
               Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !name.trim()}>
-            {unit ? "Save changes" : "Create unit"}
+            {unit ? "Guardar cambios" : "Crear unidad"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,5 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
+  boolean,
+  check,
   date,
   foreignKey,
   index,
@@ -11,6 +13,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -93,6 +96,67 @@ export const applicationStatusEnum = pgEnum("application_status", [
   "withdrawn",
 ]);
 
+export const documentEntityTypeEnum = pgEnum("document_entity_type", [
+  "property",
+  "unit",
+  "lease",
+  "tenant",
+  "work_order",
+  "message",
+]);
+
+export const messageParticipantKindEnum = pgEnum("message_participant_kind", [
+  "membership",
+  "tenant",
+]);
+
+export const messageParticipantRoleEnum = pgEnum("message_participant_role", [
+  "from",
+  "to",
+  "cc",
+]);
+
+export const messageThreadEntityTypeEnum = pgEnum("message_thread_entity_type", [
+  "property",
+  "lease",
+  "tenant",
+  "work_order",
+]);
+
+export const documentKindEnum = pgEnum("document_kind", [
+  "image",
+  "deed",
+  "certificate",
+  "invoice",
+  "signed_lease",
+  "other",
+]);
+
+export const signatureProviderEnum = pgEnum("signature_provider", ["firma_dev"]);
+
+export const leaseSignatureStatusEnum = pgEnum("lease_signature_status", [
+  "draft",
+  "sent",
+  "viewed",
+  "partially_signed",
+  "completed",
+  "declined",
+  "expired",
+  "cancelled",
+]);
+
+export const signatureRecipientRoleEnum = pgEnum("signature_recipient_role", [
+  "owner",
+  "tenant",
+]);
+
+export const signatureRecipientStatusEnum = pgEnum("signature_recipient_status", [
+  "pending",
+  "viewed",
+  "signed",
+  "declined",
+]);
+
 export type JsonObject = Record<string, unknown>;
 
 export const organizations = pgTable("organizations", {
@@ -120,6 +184,36 @@ export const memberships = pgTable(
   (table) => [
     primaryKey({ columns: [table.organizationId, table.userId] }),
     index("idx_memberships_user").on(table.userId),
+  ],
+);
+
+/**
+ * Pending access keyed by email. Accepted when that address signs in
+ * (`acceptPendingInvitations`); no SMTP in this phase.
+ */
+export const organizationInvitations = pgTable(
+  "organization_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: membershipRoleEnum("role").notNull(),
+    invitedBy: uuid("invited_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("uq_org_invitations_pending_email")
+      .on(table.organizationId, table.email)
+      .where(sql`${table.acceptedAt} IS NULL`),
+    index("idx_org_invitations_email").on(table.email),
+    check(
+      "organization_invitations_email_len",
+      sql`char_length(${table.email}) BETWEEN 3 AND 254`,
+    ),
   ],
 );
 
@@ -465,6 +559,383 @@ export const applications = pgTable(
   ],
 );
 
+/** Plain-text cap for an in-app mail body. Enforced again in the route. */
+const MAX_MESSAGE_BODY = 10_000;
+
+export const messageThreads = pgTable(
+  "message_threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    entityType: messageThreadEntityTypeEnum("entity_type"),
+    entityId: uuid("entity_id"),
+    propertyId: uuid("property_id"),
+    leaseId: uuid("lease_id"),
+    tenantId: uuid("tenant_id"),
+    workOrderId: uuid("work_order_id"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.propertyId, table.organizationId],
+      foreignColumns: [properties.id, properties.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.leaseId, table.organizationId],
+      foreignColumns: [leases.id, leases.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.tenantId, table.organizationId],
+      foreignColumns: [tenants.id, tenants.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workOrderId, table.organizationId],
+      foreignColumns: [workOrders.id, workOrders.organizationId],
+    }).onDelete("cascade"),
+    uniqueIndex("uq_message_threads_id_org").on(table.id, table.organizationId),
+    index("idx_message_threads_org_recent").on(table.organizationId, table.lastMessageAt),
+    index("idx_message_threads_property").on(table.propertyId),
+    index("idx_message_threads_lease").on(table.leaseId),
+    index("idx_message_threads_tenant").on(table.tenantId),
+    index("idx_message_threads_work_order").on(table.workOrderId),
+    check("message_threads_subject_len", sql`char_length(${table.subject}) BETWEEN 1 AND 200`),
+    check(
+      "message_threads_entity_pair",
+      sql`(
+        (${table.entityType} IS NULL AND ${table.entityId} IS NULL AND ${table.propertyId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL)
+        OR (${table.entityType} = 'property' AND ${table.propertyId} = ${table.entityId} AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL)
+        OR (${table.entityType} = 'lease' AND ${table.leaseId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL)
+        OR (${table.entityType} = 'tenant' AND ${table.tenantId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.leaseId} IS NULL AND ${table.workOrderId} IS NULL)
+        OR (${table.entityType} = 'work_order' AND ${table.workOrderId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL)
+      )`,
+    ),
+  ],
+);
+
+export const messageThreadParticipants = pgTable(
+  "message_thread_participants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    threadId: uuid("thread_id").notNull(),
+    participantKind: messageParticipantKindEnum("participant_kind").notNull(),
+    userId: uuid("user_id"),
+    tenantId: uuid("tenant_id"),
+    email: text("email").notNull(),
+    role: messageParticipantRoleEnum("role").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.threadId, table.organizationId],
+      foreignColumns: [messageThreads.id, messageThreads.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.tenantId, table.organizationId],
+      foreignColumns: [tenants.id, tenants.organizationId],
+    }).onDelete("cascade"),
+    index("idx_message_participants_thread").on(table.threadId),
+    index("idx_message_participants_user")
+      .on(table.organizationId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
+    index("idx_message_participants_tenant").on(table.tenantId),
+    uniqueIndex("uq_message_participants_user")
+      .on(table.threadId, table.userId)
+      .where(sql`${table.userId} IS NOT NULL`),
+    uniqueIndex("uq_message_participants_tenant")
+      .on(table.threadId, table.tenantId)
+      .where(sql`${table.tenantId} IS NOT NULL`),
+    check("message_participants_email_len", sql`char_length(${table.email}) BETWEEN 3 AND 320`),
+    check(
+      "message_participants_kind",
+      sql`(
+        (${table.participantKind} = 'membership' AND ${table.userId} IS NOT NULL AND ${table.tenantId} IS NULL)
+        OR (${table.participantKind} = 'tenant' AND ${table.tenantId} IS NOT NULL AND ${table.userId} IS NULL)
+      )`,
+    ),
+  ],
+);
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    threadId: uuid("thread_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    senderUserId: uuid("sender_user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.threadId, table.organizationId],
+      foreignColumns: [messageThreads.id, messageThreads.organizationId],
+    }).onDelete("cascade"),
+    uniqueIndex("uq_messages_id_org").on(table.id, table.organizationId),
+    index("idx_messages_thread_created").on(table.threadId, table.createdAt),
+    index("idx_messages_sender").on(table.organizationId, table.senderUserId),
+    check(
+      "messages_body_len",
+      sql`char_length(${table.body}) BETWEEN 1 AND ${sql.raw(String(MAX_MESSAGE_BODY))}`,
+    ),
+  ],
+);
+
+export const messageReads = pgTable(
+  "message_reads",
+  {
+    messageId: uuid("message_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    readAt: timestamp("read_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.messageId, table.userId] }),
+    foreignKey({
+      columns: [table.messageId, table.organizationId],
+      foreignColumns: [messages.id, messages.organizationId],
+    }).onDelete("cascade"),
+    index("idx_message_reads_user").on(table.organizationId, table.userId),
+  ],
+);
+
+/** 10 MiB per file. Enforced again in the upload route. */
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
+
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    entityType: documentEntityTypeEnum("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    propertyId: uuid("property_id"),
+    unitId: uuid("unit_id"),
+    leaseId: uuid("lease_id"),
+    tenantId: uuid("tenant_id"),
+    workOrderId: uuid("work_order_id"),
+    messageId: uuid("message_id"),
+    kind: documentKindEnum("kind").notNull(),
+    r2Key: text("r2_key").notNull(),
+    filename: text("filename").notNull(),
+    mime: text("mime").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    uploadedBy: uuid("uploaded_by"),
+    isCover: boolean("is_cover").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.propertyId, table.organizationId],
+      foreignColumns: [properties.id, properties.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.unitId, table.organizationId],
+      foreignColumns: [units.id, units.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.leaseId, table.organizationId],
+      foreignColumns: [leases.id, leases.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.tenantId, table.organizationId],
+      foreignColumns: [tenants.id, tenants.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.workOrderId, table.organizationId],
+      foreignColumns: [workOrders.id, workOrders.organizationId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.messageId, table.organizationId],
+      foreignColumns: [messages.id, messages.organizationId],
+    }).onDelete("cascade"),
+    index("idx_documents_org").on(table.organizationId),
+    index("idx_documents_entity")
+      .on(table.organizationId, table.entityType, table.entityId)
+      .where(sql`${table.deletedAt} IS NULL`),
+    index("idx_documents_property_id").on(table.propertyId),
+    index("idx_documents_unit_id").on(table.unitId),
+    index("idx_documents_lease_id").on(table.leaseId),
+    index("idx_documents_tenant_id").on(table.tenantId),
+    index("idx_documents_work_order_id").on(table.workOrderId),
+    index("idx_documents_message_id").on(table.messageId),
+    uniqueIndex("uq_documents_r2_key").on(table.r2Key),
+    uniqueIndex("uq_documents_one_cover")
+      .on(table.organizationId, table.entityType, table.entityId)
+      .where(sql`${table.isCover} = true AND ${table.deletedAt} IS NULL`),
+    check(
+      "documents_entity_target",
+      sql`(
+        (${table.entityType} = 'property' AND ${table.propertyId} = ${table.entityId} AND ${table.unitId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL AND ${table.messageId} IS NULL)
+        OR (${table.entityType} = 'unit' AND ${table.unitId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL AND ${table.messageId} IS NULL)
+        OR (${table.entityType} = 'lease' AND ${table.leaseId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.unitId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL AND ${table.messageId} IS NULL)
+        OR (${table.entityType} = 'tenant' AND ${table.tenantId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.unitId} IS NULL AND ${table.leaseId} IS NULL AND ${table.workOrderId} IS NULL AND ${table.messageId} IS NULL)
+        OR (${table.entityType} = 'work_order' AND ${table.workOrderId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.unitId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.messageId} IS NULL)
+        OR (${table.entityType} = 'message' AND ${table.messageId} = ${table.entityId} AND ${table.propertyId} IS NULL AND ${table.unitId} IS NULL AND ${table.leaseId} IS NULL AND ${table.tenantId} IS NULL AND ${table.workOrderId} IS NULL)
+      )`,
+    ),
+    check(
+      "documents_cover_is_image",
+      sql`(${table.isCover} = false OR ${table.kind} = 'image')`,
+    ),
+    check(
+      "documents_size_bytes",
+      sql`(${table.sizeBytes} > 0 AND ${table.sizeBytes} <= ${sql.raw(String(MAX_DOCUMENT_BYTES))})`,
+    ),
+  ],
+);
+
+export const leaseSignatures = pgTable(
+  "lease_signatures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    leaseId: uuid("lease_id").notNull(),
+    provider: signatureProviderEnum("provider").notNull().default("firma_dev"),
+    providerRequestId: text("provider_request_id"),
+    status: leaseSignatureStatusEnum("status").notNull().default("draft"),
+    documentId: uuid("document_id").references(() => documents.id, { onDelete: "set null" }),
+    sourceDocumentId: uuid("source_document_id").references(() => documents.id, {
+      onDelete: "set null",
+    }),
+    createdBy: uuid("created_by"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    audit: jsonb("audit").$type<JsonObject[]>().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.leaseId, table.organizationId],
+      foreignColumns: [leases.id, leases.organizationId],
+    }).onDelete("cascade"),
+    index("idx_lease_signatures_org").on(table.organizationId),
+    index("idx_lease_signatures_lease").on(table.leaseId),
+    index("idx_lease_signatures_document").on(table.documentId),
+    index("idx_lease_signatures_source_document").on(table.sourceDocumentId),
+    uniqueIndex("uq_lease_signatures_id_org").on(table.id, table.organizationId),
+    uniqueIndex("uq_lease_signatures_provider_request")
+      .on(table.providerRequestId)
+      .where(sql`${table.providerRequestId} IS NOT NULL`),
+    uniqueIndex("uq_lease_signatures_open")
+      .on(table.organizationId, table.leaseId)
+      .where(
+        sql`${table.status} IN ('draft', 'sent', 'viewed', 'partially_signed')`,
+      ),
+  ],
+);
+
+export const leaseSignatureRecipients = pgTable(
+  "lease_signature_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    signatureId: uuid("signature_id").notNull(),
+    providerRecipientId: text("provider_recipient_id"),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    role: signatureRecipientRoleEnum("role").notNull(),
+    sortOrder: integer("sort_order").notNull().default(1),
+    status: signatureRecipientStatusEnum("status").notNull().default("pending"),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.signatureId, table.organizationId],
+      foreignColumns: [leaseSignatures.id, leaseSignatures.organizationId],
+    }).onDelete("cascade"),
+    index("idx_lease_signature_recipients_org").on(table.organizationId),
+    index("idx_lease_signature_recipients_signature").on(table.signatureId),
+  ],
+);
+
+export const notificationKindEnum = pgEnum("notification_kind", [
+  "rent_due",
+  "rent_overdue",
+  "lease_expiring",
+  "work_order",
+  "signature",
+  "system",
+]);
+
+export const notificationSeverityEnum = pgEnum("notification_severity", [
+  "info",
+  "warning",
+  "critical",
+]);
+
+export const notificationEntityTypeEnum = pgEnum("notification_entity_type", [
+  "rent_charge",
+  "lease",
+  "work_order",
+  "lease_signature",
+]);
+
+/**
+ * Org mailbox. `user_id` null means every member of the organization.
+ * `period` is the logical bucket (charge period, lease end date, `unassigned`, signature event)
+ * so a daily cron can insert with ON CONFLICT DO NOTHING.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id"),
+    kind: notificationKindEnum("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    severity: notificationSeverityEnum("severity").notNull(),
+    entityType: notificationEntityTypeEnum("entity_type"),
+    entityId: uuid("entity_id"),
+    period: text("period").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("uq_notifications_dedupe")
+      .on(table.organizationId, table.kind, table.entityId, table.period)
+      .nullsNotDistinct(),
+    index("idx_notifications_org_created").on(table.organizationId, table.createdAt),
+    index("idx_notifications_org_kind").on(table.organizationId, table.kind),
+    index("idx_notifications_user").on(table.userId),
+    index("idx_notifications_unread")
+      .on(table.organizationId)
+      .where(sql`${table.readAt} IS NULL`),
+    check("notifications_title_len", sql`char_length(${table.title}) BETWEEN 1 AND 160`),
+    check("notifications_body_len", sql`char_length(${table.body}) BETWEEN 1 AND 2000`),
+    check("notifications_period_len", sql`char_length(${table.period}) BETWEEN 1 AND 80`),
+    check(
+      "notifications_entity_pair",
+      sql`(
+        (${table.entityType} IS NULL AND ${table.entityId} IS NULL)
+        OR (${table.entityType} IS NOT NULL AND ${table.entityId} IS NOT NULL)
+      )`,
+    ),
+  ],
+);
+
+/** Idempotency key for firma.dev webhook deliveries (`X-Firma-Delivery`). */
+export const firmaWebhookDeliveries = pgTable("firma_webhook_deliveries", {
+  deliveryId: text("delivery_id").primaryKey(),
+  eventId: text("event_id"),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const organizationsRelations = relations(organizations, ({ many }) => ({
   memberships: many(memberships),
   properties: many(properties),
@@ -502,6 +973,7 @@ export const leasesRelations = relations(leases, ({ one, many }) => ({
   }),
   rentCharges: many(rentCharges),
   leaseTenants: many(leaseTenants),
+  signatures: many(leaseSignatures),
 }));
 
 export const rentChargesRelations = relations(rentCharges, ({ one, many }) => ({

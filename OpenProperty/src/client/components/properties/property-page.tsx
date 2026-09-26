@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Building2, MapPin, Pencil, Plus, Wrench } from "lucide-react";
 import { useApp } from "@/context";
 import { api } from "@/api";
+import { formatArea } from "@/lib/format-prefs";
 import { cn, colorClasses, formatDate, formatMoney } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DocumentsPanel } from "@/components/documents/documents-panel";
 import { PropertyDialog } from "./property-dialog";
 import { UnitDialog } from "./unit-dialog";
 import { WorkOrderDialog } from "../maintenance/work-order-dialog";
@@ -72,7 +75,7 @@ export function PropertyPage({ id, navigate }: { id: string; navigate: (to: stri
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2">
         <p className="text-sm text-muted-foreground">Property not found.</p>
-        <Button variant="outline" onClick={() => navigate("/properties")}>Back to properties</Button>
+        <Button variant="outline" onClick={() => navigate("/properties")}>Volver a propiedades</Button>
       </div>
     );
   }
@@ -122,12 +125,18 @@ export function PropertyPage({ id, navigate }: { id: string; navigate: (to: stri
         </header>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <SummaryCard label="Units" value={String(units.length)} />
-          <SummaryCard label="Occupied" value={`${occupied}/${units.length}`} />
-          <SummaryCard label="Market rent" value={formatMoney(totalRent, app.settings.currency)} />
-          <SummaryCard label="Open work orders" value={String(openWorkOrders.length)} tone={openWorkOrders.length > 0 ? "warn" : "default"} />
+          <SummaryCard label="Unidades" value={String(units.length)} />
+          <SummaryCard label="Ocupadas" value={`${occupied}/${units.length}`} />
+          <SummaryCard label="Renta de mercado" value={formatMoney(totalRent, app.settings.currency)} />
+          <SummaryCard label="Órdenes abiertas" value={String(openWorkOrders.length)} tone={openWorkOrders.length > 0 ? "warn" : "default"} />
         </section>
 
+        <Tabs defaultValue="general">
+          <TabsList>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="documents">Documentos</TabsTrigger>
+          </TabsList>
+          <TabsContent value="general" className="space-y-6">
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-[1.0625rem] font-semibold leading-tight">Units</h2>
@@ -147,7 +156,7 @@ export function PropertyPage({ id, navigate }: { id: string; navigate: (to: stri
                     <div>
                       <h3 className="font-semibold">{u.name}</h3>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {u.bedrooms} bd · {u.bathrooms} ba{u.sqft ? ` · ${u.sqft} sqft` : ""}
+                        {u.bedrooms} rec. · {u.bathrooms} baños{u.sqft ? ` · ${formatArea(u.sqft)}` : ""}
                       </p>
                     </div>
                     <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold capitalize", STATUS_TONE[u.status])}>
@@ -200,6 +209,11 @@ export function PropertyPage({ id, navigate }: { id: string; navigate: (to: stri
             </Card>
           )}
         </section>
+          </TabsContent>
+          <TabsContent value="documents">
+            <DocumentsPanel entityType="property" entityId={property.id} />
+          </TabsContent>
+        </Tabs>
 
       <PropertyDialog
         open={editingProperty}

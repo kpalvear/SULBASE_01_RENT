@@ -7,8 +7,8 @@ import { canMutate } from "./roles";
 import { resolveTenant } from "./tenant";
 import { uuidParam } from "../pg";
 
-const PUBLIC_PATHS = new Set(["/api/health"]);
-const JWT_ONLY_PATHS = new Set(["/api/auth/bootstrap", "/api/me"]);
+const PUBLIC_PATHS = new Set(["/api/health", "/api/webhooks/firma"]);
+const JWT_ONLY_PATHS = new Set(["/api/auth/bootstrap", "/api/me", "/api/account"]);
 
 /** Never bypass when JWT secret is configured (production must set the secret). */
 function isDevBypass(env: { AUTH_DEV_BYPASS?: string; SUPABASE_JWT_SECRET?: string }): boolean {

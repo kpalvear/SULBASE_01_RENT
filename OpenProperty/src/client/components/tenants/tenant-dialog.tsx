@@ -138,9 +138,9 @@ export function TenantDialog({ open, onOpenChange, tenant, onSaved }: Props) {
               Delete
             </Button>
           )}
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button type="button" onClick={save} disabled={saving || !firstName.trim() || !lastName.trim()}>
-            {tenant ? "Save changes" : "Create tenant"}
+            {tenant ? "Guardar cambios" : "Crear inquilino"}
           </Button>
         </DialogFooter>
       </DialogContent>

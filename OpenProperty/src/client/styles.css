@@ -42,7 +42,7 @@
   --accent: #f7f7f5;
   --accent-foreground: #1b1a19;
 
-  /* ── Brand: OpenProperty's own hue (H 149.2, from icon.svg #16A34A). ──
+  /* ── Brand: RENT hue (H 149.2, from icon.svg #16A34A). ──
      It appears in exactly three places — the app icon, count badges, and the
      focus ring — and never as a status badge. */
   --brand: #31974e;               /* solid  L 0.60 C 85% */

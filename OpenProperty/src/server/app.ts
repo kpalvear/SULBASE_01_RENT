@@ -8,6 +8,7 @@ const app = factory.createApp();
 
 app.use("/api/auth/*", authRouteRateLimit);
 app.use("/api/me", authRouteRateLimit);
+app.use("/api/account", authRouteRateLimit);
 app.use("/api/*", apiRateLimit);
 app.use("*", dbMiddleware);
 app.use("*", authMiddleware);

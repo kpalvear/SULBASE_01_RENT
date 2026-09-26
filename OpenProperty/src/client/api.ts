@@ -42,6 +42,32 @@ export async function api<T>(
     opts.body = JSON.stringify(body);
   }
   const r = await fetch(path, opts);
+  return readJson<T>(r);
+}
+
+export async function apiForm<T>(path: string, form: FormData, auth?: ApiAuthOptions): Promise<T> {
+  const authHeaders = await resolveAuthHeaders(auth);
+  const r = await fetch(path, { method: "POST", headers: authHeaders, body: form });
+  return readJson<T>(r);
+}
+
+export async function apiBlob(path: string, auth?: ApiAuthOptions): Promise<Blob> {
+  const authHeaders = await resolveAuthHeaders(auth);
+  const r = await fetch(path, { headers: authHeaders });
+  if (!r.ok) {
+    let message = `${r.status} ${r.statusText}`;
+    try {
+      const data = (await r.json()) as { error?: string };
+      if (data.error) message = data.error;
+    } catch {
+      /* binary error */
+    }
+    throw new Error(message);
+  }
+  return r.blob();
+}
+
+async function readJson<T>(r: Response): Promise<T> {
   let data: unknown = null;
   try {
     data = await r.json();
@@ -49,8 +75,14 @@ export async function api<T>(
     /* empty body */
   }
   if (!r.ok) {
-    const msg = (data as { error?: string } | null)?.error || `${r.status} ${r.statusText}`;
-    throw new Error(msg);
+    const bodyError = (data as { error?: string } | null)?.error;
+    if (bodyError) throw new Error(bodyError);
+    if (r.status === 500 || r.status === 502 || r.status === 503) {
+      throw new Error(
+        "API no disponible (Worker en :8787). Reinicia con pnpm dev:auth y espera [api] Ready.",
+      );
+    }
+    throw new Error(`${r.status} ${r.statusText}`);
   }
   return data as T;
 }

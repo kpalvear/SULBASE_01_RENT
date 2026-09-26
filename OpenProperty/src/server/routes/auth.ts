@@ -3,20 +3,23 @@ import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 import { memberships, organizations } from "../../db/schema";
 import type { AppEnv } from "../env";
+import { acceptPendingInvitations } from "../auth/accept-invitations";
 import { reconcileMembershipsByEmail } from "../auth/reconcile-memberships";
 import { listMemberships, resolveTenant, slugifyOrganizationName } from "../auth/tenant";
 import { parseJson } from "../validation";
 import { uuidSchema } from "../schemas/common";
 import type { Context } from "hono";
 
-async function reconcileIfNeeded(c: Context<AppEnv>): Promise<void> {
+async function syncIdentity(c: Context<AppEnv>): Promise<void> {
   const userId = c.get("userId");
   const email = c.get("userEmail");
   if (!userId || !email) return;
   const db = c.get("db");
   const current = await listMemberships(db, userId);
-  if (current.length > 0) return;
-  await reconcileMembershipsByEmail(c.get("sql"), userId, email);
+  if (current.length === 0) {
+    await reconcileMembershipsByEmail(c.get("sql"), userId, email);
+  }
+  await acceptPendingInvitations(c.get("sql"), userId, email);
 }
 
 const BootstrapBody = z.object({
@@ -44,7 +47,7 @@ export function mountAuthRoutes(app: Hono<AppEnv>) {
     }
 
     const db = c.get("db");
-    await reconcileIfNeeded(c);
+    await syncIdentity(c);
     const membershipsList = await listMemberships(db, userId);
     const requestedOrg = c.req.header("X-Organization-Id");
     const tenant = await resolveTenant(
@@ -77,7 +80,7 @@ export function mountAuthRoutes(app: Hono<AppEnv>) {
     if (!parsed.ok) return c.json({ error: parsed.error }, 400);
 
     const db = c.get("db");
-    await reconcileIfNeeded(c);
+    await syncIdentity(c);
     const existing = await listMemberships(db, userId);
     if (existing.length > 0) {
       const first = existing[0];

@@ -39,7 +39,7 @@ export async function get<T>(
   return rows[0];
 }
 
-export type SqlParam = string | number | boolean | null;
+export type SqlParam = string | number | boolean | null | string[];
 
 export async function run(
   c: Context<AppEnv>,

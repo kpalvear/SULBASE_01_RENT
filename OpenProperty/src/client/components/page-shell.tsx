@@ -1,3 +1,4 @@
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,7 +38,10 @@ export function PageShell({
         ) : (
           <div className="flex-1" />
         )}
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <NotificationBell />
+          {actions}
+        </div>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
         <div className={cn("mx-auto w-full space-y-6 p-6", width)}>{children}</div>
